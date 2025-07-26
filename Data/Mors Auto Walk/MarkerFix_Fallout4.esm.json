@@ -1,0 +1,422 @@
+{
+  "72a48_name": "Sanctuary Hills",
+  "72a48_position": [
+    -80352.0,
+    89600.0,
+    7798.115234
+  ],
+  "2c866_name": "Old North Church",
+  "2c866_position": [
+    31019.986328,
+    330.40033,
+    592.0
+  ],
+  "22628_name": "Goodneighbor",
+  "22628_position": [
+    19699.308594,
+    -11676.188477,
+    613.359375
+  ],
+  "2b86b_name": "Old Gullet Sinkhole",
+  "2b86b_position": [
+    24406.125,
+    66628.570312,
+    1416.0
+  ],
+  "2b88f_name": "East Boston Preparatory School",
+  "2b88f_position": [
+    45707.972656,
+    15409.75293,
+    906.166748
+  ],
+  "2b967_name": "Libertalia",
+  "2b967_position": [
+    81399.90625,
+    24471.171875,
+    508.610107
+  ],
+  "2ba49_name": "Nahant Oceanological Society",
+  "2ba49_position": [
+    104288.859375,
+    24866.576172,
+    754.325684
+  ],
+  "2bb12_name": "Boston Public Library",
+  "2bb12_position": [
+    -2937.21875,
+    -20556.486328,
+    1312.0
+  ],
+  "2bba3_name": "Faneuil Hall",
+  "2bba3_position": [
+    25448.0,
+    -6222.0,
+    555.69574
+  ],
+  "2bc66_name": "USAF Satellite Station Olivia",
+  "2bc66_position": [
+    -41775.300781,
+    90561.945312,
+    7503.648437
+  ],
+  "2bf2d_name": "National Guard Training Yard",
+  "2bf2d_position": [
+    40757.089844,
+    36963.011719,
+    872.0
+  ],
+  "2c07f_name": "Crater House",
+  "2c07f_position": [
+    88528.367188,
+    65698.648437,
+    825.321533
+  ],
+  "5483f_name": "Mahkra Fishpacking",
+  "5483f_position": [
+    82033.078125,
+    94526.648438,
+    745.044983
+  ],
+  "3d833_name": "Longneck Lukowski's Cannery",
+  "3d833_position": [
+    78146.75,
+    57570.949219,
+    643.788818
+  ],
+  "2c6ab_name": "Egret Tours Marina",
+  "2c6ab_position": [
+    -30850.392578,
+    -62923.5,
+    1458.922241
+  ],
+  "2c6e3_name": "Westing Estate",
+  "2c6e3_position": [
+    -45096.335938,
+    -41018.105469,
+    1423.463867
+  ],
+  "6f5d4_name": "Abernathy Farm",
+  "6f5d4_position": [
+    -74512.4375,
+    68699.164062,
+    7482.121094
+  ],
+  "96c89_name": "Listening Post Bravo",
+  "96c89_position": [
+    40253.929688,
+    62624.210937,
+    1467.126221
+  ],
+  "2b83e_name": "Mass Fusion Building",
+  "2b83e_position": [
+    17397.748047,
+    -8050.321289,
+    614.673706
+  ],
+  "24fa1_name": "Thicket Excavations",
+  "24fa1_position": [
+    -41021.316406,
+    80421.039062,
+    4618.620117
+  ],
+  "2c72e_name": "HalluciGen, Inc.",
+  "2c72e_position": [
+    4487.970703,
+    -14243.023437,
+    911.363892
+  ],
+  "25561_name": "Cambridge Polymer Labs",
+  "25561_position": [
+    -25229.617188,
+    -2459.123047,
+    975.645874
+  ],
+  "2bd42_name": "Andrew Station",
+  "2bd42_position": [
+    22628.589844,
+    -41585.710938,
+    697.128174
+  ],
+  "2bfe5_name": "Med-Tek Research",
+  "2bfe5_position": [
+    20705.869141,
+    53604.082031,
+    1453.130005
+  ],
+  "2bfcf_name": "West Everett Estates",
+  "2bfcf_position": [
+    13868.101562,
+    44549.222656,
+    1044.439575
+  ],
+  "9b1b1_name": "Tenpines Bluff",
+  "9b1b1_position": [
+    -22047.945312,
+    88160.828125,
+    6056.0
+  ],
+  "9b1bf_name": "Nordhagen Beach",
+  "9b1bf_position": [
+    64962.992187,
+    3793.277344,
+    709.44165
+  ],
+  "2bca5_name": "The Castle",
+  "2bca5_position": [
+    48049.542969,
+    -46590.757812,
+    837.996094
+  ],
+  "a0180_name": "Hub 360",
+  "a0180_position": [
+    23986.345703,
+    -19349.541016,
+    570.387695
+  ],
+  "2c6fc_name": "ArcJet Systems",
+  "2c6fc_position": [
+    -66651.445312,
+    22410.574219,
+    3377.986572
+  ],
+  "186bd0_name": "East Boston Police Station",
+  "186bd0_position": [
+    38212.027344,
+    9626.292969,
+    454.818268
+  ],
+  "2bc1a_name": "Wreck of the FMS Northern Star",
+  "2bc1a_position": [
+    57813.859375,
+    -82198.75,
+    813.994141
+  ],
+  "2112f_name": "Trinity Tower",
+  "2112f_position": [
+    3484.285156,
+    -22600.382812,
+    1334.79895
+  ],
+  "2bbd0_name": "Forest Grove Marsh",
+  "2bbd0_position": [
+    -60176.0,
+    -17807.626953,
+    1680.950806
+  ],
+  "adda4_name": "Sentinel Site",
+  "adda4_position": [
+    -78431.59375,
+    -139505.203125,
+    5330.738281
+  ],
+  "2c64c_name": "Quincy Quarries",
+  "2c64c_position": [
+    14110.332031,
+    -78224.039062,
+    450.04187
+  ],
+  "eae52_name": "General Atomics Galleria",
+  "eae52_position": [
+    5433.864258,
+    80034.609375,
+    1679.325439
+  ],
+  "10034f6_name": "Nakano residence",
+  "10034f6_position": [
+    80224.007812,
+    122581.398437,
+    635.501892
+  ],
+  "2b7dc_name": "Beantown Brewery",
+  "2b7dc_position": [
+    -40726.960938,
+    3504.932861,
+    875.123779
+  ],
+  "3f035_name": "Combat Zone",
+  "3f035_position": [
+    13826.46875,
+    -23077.857422,
+    678.613708
+  ],
+  "1cad5_name": "Diamond City",
+  "1cad5_position": [
+    -14601.295898,
+    -29619.923828,
+    1368.0
+  ],
+  "edcee_name": "Drumlin Diner",
+  "edcee_position": [
+    -50552.0,
+    54768.0,
+    4696.0
+  ],
+  "24f9a_name": "Fort Hagen",
+  "24f9a_position": [
+    -85528.34375,
+    -5195.026855,
+    6007.47168
+  ],
+  "2bc07_name": "Four Leaf Fishpacking Plant",
+  "2bc07_position": [
+    29494.847656,
+    -36405.390625,
+    630.238281
+  ],
+  "f75e9_name": "General Atomics Factory",
+  "f75e9_position": [
+    36912.308594,
+    -36110.117188,
+    731.38855
+  ],
+  "2c71e_name": "Hardware Town",
+  "2c71e_position": [
+    -22160.099609,
+    -33638.507812,
+    1874.18396
+  ],
+  "2bb54_name": "Charles View Amphitheater",
+  "2bb54_position": [
+    6758.769531,
+    -9332.279297,
+    512.0
+  ],
+  "16a6b9_name": "Kendall Hospital",
+  "16a6b9_position": [
+    -15458.883789,
+    10099.37207,
+    1593.960449
+  ],
+  "2c561_name": "Malden Center",
+  "2c561_position": [
+    14945.125,
+    58717.632812,
+    1266.315308
+  ],
+  "2c16e_name": "Medford Memorial Hospital",
+  "2c16e_position": [
+    14065.546875,
+    58678.453125,
+    1288.28186
+  ],
+  "b3cba_name": "Museum of Witchcraft",
+  "b3cba_position": [
+    83447.390625,
+    74600.046875,
+    673.826538
+  ],
+  "4d53e_name": "Parsons Creamery",
+  "4d53e_position": [
+    50975.632812,
+    100216.796875,
+    2010.279297
+  ],
+  "2c10d_name": "Parsons State Insane Asylum",
+  "2c10d_position": [
+    55239.621094,
+    82024.09375,
+    1392.981812
+  ],
+  "2c611_name": "Quincy Ruins",
+  "2c611_position": [
+    21666.898438,
+    -86244.625,
+    1047.502441
+  ],
+  "14d16f_name": "Railroad HQ",
+  "14d16f_position": [
+    31956.671875,
+    1632.064331,
+    610.555603
+  ],
+  "2bee8_name": "Revere Satellite Array",
+  "2bee8_position": [
+    45106.335938,
+    37511.480469,
+    826.297607
+  ],
+  "b4654_name": "Rocky Cave",
+  "b4654_position": [
+    -116071.84375,
+    -136657.21875,
+    9850.794922
+  ],
+  "2c1b7_name": "Rook Family House",
+  "2c1b7_position": [
+    94274.140625,
+    85042.609375,
+    1096.0
+  ],
+  "2c07b_name": "Saugus Ironworks",
+  "2c07b_position": [
+    53504.0,
+    61264.996094,
+    904.0
+  ],
+  "2bc76_name": "Shamrock Taphouse",
+  "2bc76_position": [
+    30250.009766,
+    -17623.210938,
+    593.002197
+  ],
+  "2c088_name": "Vault 75",
+  "2c088_position": [
+    18709.947266,
+    62262.558594,
+    1150.144775
+  ],
+  "2bc4b_name": "Vault 95",
+  "2bc4b_position": [
+    -49918.070312,
+    -89569.054688,
+    4285.133301
+  ],
+  "8bce7_name": "Yangtze",
+  "8bce7_position": [
+    35044.855469,
+    -21387.8125,
+    594.046875
+  ],
+  "90e59_name": "Boston Airport",
+  "90e59_position": [
+    46772.972656,
+    -4219.820312,
+    572.366333
+  ],
+  "2c26e_name": "Kingsport Lighthouse",
+  "2c26e_position": [
+    87201.226562,
+    58846.140625,
+    1151.65625
+  ],
+  "2ba8f_name": "The Slog",
+  "2ba8f_position": [
+    55742.480469,
+    69988.609375,
+    1155.477417
+  ],
+  "9b1e5_name": "Somerville Place",
+  "9b1e5_position": [
+    -34704.890625,
+    -91140.367188,
+    1864.964844
+  ],
+  "24f95_name": "Starlight Drive-In",
+  "24f95_position": [
+    -39066.480469,
+    58380.90625,
+    3902.76416
+  ],
+  "24fa0_name": "Sunshine Tidings Co-op",
+  "24fa0_position": [
+    -85952.0,
+    38656.0,
+    6650.354492
+  ],
+  "2bffe_name": "Taffington Boathouse",
+  "2bffe_position": [
+    4232.839355,
+    45167.746094,
+    575.631836
+  ]
+}

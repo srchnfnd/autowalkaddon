@@ -1,0 +1,289 @@
+{
+	"modName": "Mors Auto Walk",
+	"displayName": "Mors Auto Walk",
+	"minMcmVersion": 1,
+	"pluginRequirements": ["Mors Auto Walk.esl"],
+	"content": [
+		{ "type": "hotkey", "text": "Auto-walk Activation/Menu", "id": "MorsAutoWalkHotkey1",
+          "help": "Tap to stop/resume walking, or hold and release to select new destination."
+        },
+		{ "type": "slider", "text": "Hotkey hold time (seconds)",
+			"help": "How long do you have to hold the hotkey down until it opens the menu. Range: 0.1 - 5.0 seconds",
+			"valueOptions": {
+				"min": 0.1, "max": 5.0, "step": 0.1,
+				"sourceType": "PropertyValueFloat",
+				"sourceForm": "Mors Auto Walk.esl|f99",
+				"propertyName": "HotkeyHoldTime"
+			}
+		},
+		{ "type": "spacer", "numLines": 1},
+		{ "type": "switcher", "text": "Only discovered locations",
+			"help": "Only discovered (and non-discoverable) locations will be shown in the destination menu.",
+			"valueOptions": {
+				"sourceType": "PropertyValueBool",
+				"sourceForm": "Mors Auto Walk.esl|f99",
+				"propertyName": "bOnlyDiscovered"
+			}
+		},
+		{ "type": "spacer", "numLines": 1},
+		{ "type": "switcher", "text": "Use Message Box as stop notification",
+			"help": "When the walking stops, a message box will be shown to pause the game (usefull if you went AFK and the destination is reached before you get back).",
+			"valueOptions": {
+				"sourceType": "PropertyValueBool",
+				"sourceForm": "Mors Auto Walk.esl|f99",
+				"propertyName": "bStopMessageBox"
+			}
+		},
+		{ "type": "switcher", "text": "Combat warning (recommended)",
+			"help": "Shows a message box, pausing the game, to prevent dying when running into enemies.",
+			"valueOptions": {
+				"sourceType": "PropertyValueBool",
+				"sourceForm": "Mors Auto Walk.esl|f99",
+				"propertyName": "bCombatWarning"
+			}
+		},
+		{ "type": "switcher", "text": "Invincible (recommended)",
+			"help": "Makes player immune to damage while traveling.",
+			"valueOptions": {
+				"sourceType": "PropertyValueBool",
+				"sourceForm": "Mors Auto Walk.esl|f99",
+				"propertyName": "bInvincible"
+			}
+		},
+		{ "type": "switcher", "text": "Radiation Immunity (recommended)",
+			"help": "Makes the player immune to radiation while traveling.",
+			"valueOptions": {
+				"sourceType": "PropertyValueBool",
+				"sourceForm": "Mors Auto Walk.esl|f99",
+				"propertyName": "bRadResistant"
+			}
+		},
+		{ "type": "switcher", "text": "Trap Safety (recommended)",
+			"help": "Player will not trigger land based traps or mines while traveling.",
+			"valueOptions": {
+				"sourceType": "PropertyValueBool",
+				"sourceForm": "Mors Auto Walk.esl|f99",
+				"propertyName": "bTrapSafety"
+			}
+		},
+		{ "type": "switcher", "text": "No Aggro",
+			"help": "Nothing should attack player while traveling (there are few exceptions like the robots in Nuka Galaxy Zone who are too aggressive).",
+			"valueOptions": {
+				"sourceType": "PropertyValueBool",
+				"sourceForm": "Mors Auto Walk.esl|f99",
+				"propertyName": "bCaptive"
+			}
+		},
+		{ "type": "spacer", "numLines": 1},
+    {
+      "type": "button", "text": "Start Building Marker DB",
+      "help": "Build Marker DB for Custom Destination. WARNING: This may take tens of minutes.",
+      "action": {
+        "type": "CallFunction",
+        "form": "Mors Auto Walk Addon.esp|100D",
+        "function": "BuildMapMarkerDatabase"
+      }
+    },
+    {
+        "type": "spacer", "numLines": 1
+    },
+    {
+        "type": "section",
+        "text": "Debug"
+    },
+    {
+      "type": "button", "text": "Add new User Map Marker to Marker DB",
+      "help": "Add a user marker. This can be used to patch up navmesh/marker holes on the Fallout world map and helps guessing ground Z.",
+      "action": {
+        "type": "CallFunction",
+        "form": "Mors Auto Walk Addon.esp|100D",
+        "function": "AddCurrentPositionToUserMarkerDB"
+      }
+    },
+    {
+        "text": "User Map Markers",
+			  "help": "Shows current WorldSpace's User Map Markers",
+        "type": "text"
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot0" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}0","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot1" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}1","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot2" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}2","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot3" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}3","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot4" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}4","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot5" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}5","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot6" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}6","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot7" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}7","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot8" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}8","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot9" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}9","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot10" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}10","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot11" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}11","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot12" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}12","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot13" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}13","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot14" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}14","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot15" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}15","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot16" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}16","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot17" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}17","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot18" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}18","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot19" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}19","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot20" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}20","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot21" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}21","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot22" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}22","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot23" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}23","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot24" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}24","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot25" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}25","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot26" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}26","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot27" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}27","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot28" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}28","{value}"] }
+    },
+    {
+        "text": "",
+        "type": "textinput",
+        "valueOptions": { "sourceType": "PropertyValueString", "sourceForm": "Mors Auto Walk Addon.esp|100D", "propertyName": "markerSlot29" },
+				"action": { "type": "CallFunction", "form": "Mors Auto Walk Addon.esp|100D", "function": "UpdateUserMapMarkerList", "params": ["{i}29","{value}"] }
+    }
+	]
+}

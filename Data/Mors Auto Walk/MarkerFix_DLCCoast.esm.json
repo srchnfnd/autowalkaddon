@@ -1,0 +1,206 @@
+{
+  "0049fb_name": "Eden Meadows Cinemas",
+  "0049fb_position": [
+    -4305.814941,
+    22371.353516,
+    917.195068
+  ],
+  "00ece5_name": "Brooke's Head Lighthouse",
+  "00ece5_position": [
+    -2713.757080,
+    -57493.757812,
+    1287.827148
+  ],
+  "016e37_name": "Cliff's Edge Hotel",
+  "016e37_position": [
+    30203.316406,
+    34672.484375,
+    3072.000000
+  ],
+  "016e3d_name": "Vim! Pop factory",
+  "016e3d_position": [
+    575.431641,
+    -30541.570312,
+    855.101501
+  ],
+  "02f40d_name": "Harbor Grand Hotel",
+  "02f40d_position": [
+    44992.000000,
+    -20544.007812,
+    1500.357300
+  ],
+  "0247bf_name": "National Park campground",
+  "0247bf_position": [
+    32697.482422,
+    28013.572266,
+    4024.491943
+  ],
+  "038eb0_name": "Dalton farm",
+  "038eb0_position": [
+    6852.441895,
+    58703.597656,
+    778.147827
+  ],
+  "04d6b8_name": "Rayburn Point",
+  "04d6b8_position": [
+    -45086.878906,
+    5680.917480,
+    1178.276367
+  ],
+  "05422b_name": "Rock Point camp",
+  "05422b_position": [
+    -41156.804688,
+    -18374.240234,
+    545.649902
+  ],
+  "054254_name": "Zephyr Ridge Camp",
+  "054254_position": [
+    -35551.046875,
+    -15918.958008,
+    1082.059570
+  ],
+  "05689f_name": "Ruined church",
+  "05689f_position": [
+    -12536.426758,
+    -32935.023437,
+    686.447388
+  ],
+  "056918_name": "Radiant Crest Shrine",
+  "056918_position": [
+    -15438.143555,
+    -18815.365234,
+    2987.893311
+  ],
+  "05422a_name": "Ruined radio tower",
+  "05422a_position": [
+    -1264.071045,
+    -14633.171875,
+    3429.013184
+  ],
+  "00afe3_name": "Atom's Spring",
+  "00afe3_position": [
+    -16817.314453,
+    -3191.699707,
+    595.968872
+  ],
+  "05689a_name": "Briney's Bait and Tackle",
+  "05689a_position": [
+    -23646.935547,
+    9550.772461,
+    742.578735
+  ],
+  "04f8e2_name": "Children of Atom shrine",
+  "04f8e2_position": [
+    -30459.105469,
+    -25614.914062,
+    457.177612
+  ],
+  "04fe1b_name": "Cranberry Island Bog",
+  "04fe1b_position": [
+    26272.496094,
+    -47693.023438,
+    585.320679
+  ],
+  "04f140_name": "Cranberry Island docks",
+  "04f140_position": [
+    24491.255859,
+    -44689.007812,
+    1020.890564
+  ],
+  "04fe1d_name": "Cranberry Island supply shed",
+  "04fe1d_position": [
+    34400.800781,
+    -54326.062500,
+    533.363464
+  ],
+  "04855f_name": "DiMA's cache",
+  "04855f_position": [
+    -58994.664062,
+    13311.583008,
+    483.548035
+  ],
+  "01536c_name": "Eagle's Cove Tannery",
+  "01536c_position": [
+    -6589.357422,
+    36089.718750,
+    1013.211243
+  ],
+  "01fc9a_name": "Echo Lake Lumber",
+  "01fc9a_position": [
+    -22047.375000,
+    6468.397461,
+    740.015991
+  ],
+  "005c7a_name": "Far Harbor",
+  "005c7a_position": [
+    54405.648437,
+    33237.644531,
+    799.893616
+  ],
+  "011a81_name": "Fringe Cove docks",
+  "011a81_position": [
+    -16930.962891,
+    -46587.605469,
+    762.085449
+  ],
+  "05691b_name": "Glowing Grove",
+  "05691b_position": [
+    -23201.031250,
+    -10884.832031,
+    1326.841553
+  ],
+  "01fd17_name": "Haddock Cove",
+  "01fd17_position": [
+    -33056.000000,
+    -35711.320312,
+    512.000000
+  ],
+  "016e34_name": "Horizon Flight 1207",
+  "016e34_position": [
+    17808.103516,
+    17893.761719,
+    3455.486328
+  ],
+  "04fd24_name": "Longfellow's cabin",
+  "04fd24_position": [
+    54652.511719,
+    43379.753906,
+    913.033203
+  ],
+  "024f71_name": "Northwood Ridge Quarry",
+  "024f71_position": [
+    1107.416748,
+    -48542.468750,
+    533.256653
+  ],
+  "04ffa6_name": "Oceanarium",
+  "04ffa6_position": [
+    -9929.492188,
+    47436.949219,
+    1110.598145
+  ],
+  "04ffa8_name": "Old Pond House",
+  "04ffa8_position": [
+    31930.031250,
+    -8757.494141,
+    3594.336182
+  ],
+  "0399ca_name": "Southwest Harbor",
+  "0399ca_position": [
+    12738.160156,
+    -21605.523438,
+    1040.561157
+  ],
+  "0567be_name": "Waves Crest Orphanage",
+  "0567be_position": [
+    9461.176758,
+    -52354.207031,
+    964.451111
+  ],
+  "02f40b_name": "Wind Farm Maintenance",
+  "02f40b_position": [
+    46186.23,
+    6212.95,
+    5964.01
+  ]
+}
