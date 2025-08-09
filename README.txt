@@ -21,7 +21,7 @@ These are inherited from the original AutoWalk mod and are still unresolved:
 
 Unsupported Worldspaces
 ------------------------
-Auto walking is currently not supported in "interior" or sub-worldspaces like:
+Auto walking to Custom Destination is currently not supported in "interior" or sub-worldspaces like:
 - Diamond City
 - Goodneighbor
 
@@ -43,18 +43,3 @@ Credits
 - Original Mod: Auto Walk by Mor
 - Script Polish & Documentation Support: ChatGPT
 
-Permissions
----------------------
-I hoped this mod to be adopted by original author in his next release.
-This mod and its source files are released freely to the community.
-
-You are welcome to:
-- Use or modify it for personal or public projects
-- Redistribute it or include it in modpacks
-- Fork or extend the scripts in any way
-
-No permission is required. Attribution is appreciated but not required.
-
-This mod is intended as a community resource — enjoy, improve, and share.
-
-Enjoy the walk.

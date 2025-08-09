@@ -800,6 +800,7 @@ Function OnSetUserMarkerName(string markerName)
     SUP_F4SE.MapMarkerSetName(spareMarker, markerName)
     SaveUserMapMarkerName(spareMarker, markerName)
     cells[cellIndex].markers.AddForm(spareMarker)
+    spareMarker.Enable()
     Debug.Notification("AutoWalk: New user map marker added: " + SUP_F4SE.MapMarkerGetName(spareMarker))
     Debug.Trace("AutoWalk: New user map marker added: " + SUP_F4SE.MapMarkerGetName(spareMarker) + " (" + spareMarker.x + ", " + spareMarker.y + ", " + spareMarker.z + ")", 1)
   endif
@@ -1113,6 +1114,7 @@ Function UpdateUserMapMarkerList(int idx, string value)
       Debug.Trace("AutoWalk: UpdateUserMapMarkerList(): ERROR: user marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " not found in database", 1)
     endif
     usedList.RemoveAddedForm(marker)
+    (marker as ObjectReference).Disable()
     DeleteUserMapMarkerName(marker as ObjectReference)
     RefreshUserMapMarkers()
   else
