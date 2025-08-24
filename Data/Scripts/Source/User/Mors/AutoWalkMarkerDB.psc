@@ -130,6 +130,8 @@ String Property markerSlot29 Auto Hidden
 
 CustomEvent UpdateCustomDestination
 
+
+
 ; =======================
 ; === STATE VARIABLES ===
 ; =======================
@@ -159,13 +161,14 @@ CustomDestinationMarkerInfo currentDestinationMarkerInfo = None
 Event OnQuestInit()
   Debug.Trace("AutoWalk: OnQuestInit", 1)
   RegisterForRemoteEvent(PlayerRef, "OnPlayerLoadGame")
+  RegisterForExternalEvent("OnMCMOpen", "OnMCMOpen")
+  RegisterForExternalEvent("OnMCMClose", "OnMCMClose")
 EndEvent
 
 Event Actor.OnPlayerLoadGame(Actor sender)
   Debug.Trace("AutoWalk: OnPlayerLoadGame.", 1)
   SUP_F4SE.RegisterForSUPEvent("OnPlayerMapMarkerStateChange", self as Form, "Mors:AutoWalkMarkerDB", "OnPlayerMapMarkerStateChange", true, false)
   SUP_F4SE.RegisterForSUPEvent("OnCellChange", self as Form, "Mors:AutoWalkMarkerDB", "OnCellChange", true, false)
-  RegisterForExternalEvent("OnMCMOpen", "OnMCMOpen")
   isCalibrating = false
 
   if databaseState == STATE_BUILDING
@@ -802,7 +805,6 @@ Function OnSetUserMarkerName(string markerName)
     cells[cellIndex].markers.AddForm(spareMarker)
     spareMarker.Enable()
     Debug.Notification("AutoWalk: New user map marker added: " + SUP_F4SE.MapMarkerGetName(spareMarker))
-    Debug.Trace("AutoWalk: New user map marker added: " + SUP_F4SE.MapMarkerGetName(spareMarker) + " (" + spareMarker.x + ", " + spareMarker.y + ", " + spareMarker.z + ")", 1)
   endif
 EndFunction
 
@@ -1072,8 +1074,11 @@ EndFunction
 
 ; Called when the MCM menu is opened.
 Function OnMCMOpen()
-  Debug.Trace("AutoWalk: OnMCMOpen() called...", 1)
   RefreshUserMapMarkers()
+EndFunction
+
+Function OnMCMClose()
+
 EndFunction
 
 ; Updates the user map marker list in the MCM and database.

@@ -41,5 +41,17 @@ These mods enhance accuracy and immersion:
 Credits
 -------
 - Original Mod: Auto Walk by Mor
-- Script Polish & Documentation Support: ChatGPT
+- Script arcane knowlage & Documentation Support: ChatGPT
 
+Permissions
+---------------------
+This mod and its source files are released freely to the community.
+
+You are welcome to:
+- Use or modify it for personal or public projects
+- Redistribute it or include it in modpacks
+- Fork or extend the scripts in any way
+
+No permission is required. Attribution is appreciated but not required.
+
+Enjoy the walk.

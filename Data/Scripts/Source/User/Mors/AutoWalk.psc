@@ -117,6 +117,7 @@ bool bRegisteredCombatStateEvent = false
 float arrivalCheckInterval = 3.0
 
 Mors:AutoWalkMarkerDB Property MarkerDBScript Auto const 
+Mors:AWR_ThreatDetector Property ThreatDetectorScript Auto const 
 
 function ShowMenu()
 	if Utility.IsInMenuMode() ; This shouldn't be true unless the Pipboy is open
@@ -443,22 +444,43 @@ event OnControlDown(string _ctl)
 	endIf
 endEvent
 
-function StartWalking()
-	
-	if DstMarker.GetReference()
-		Debug.Notification("Walking to "+ dstName)
-		bStopNotification = true
-		RegisterForCustomEvent(Self, "SceneStopped")
-		RegisterForRemoteEvent(MorsAW_Scene, "OnBegin")
-		RegisterForRemoteEvent(MorsAW_Scene, "OnEnd")
-		if MorsAW_Scene.IsPlaying()
-			GoToState("RESTARTING")
-		else
-			GoToState("STARTING")
-		endIf
-	else
-		
-	endIf
+function OnCombatClearWaitResult(int resultCode)
+    if resultCode == ThreatDetectorScript.AWR_WAIT_OK()
+        ; resume autowalk
+		if DstMarker.GetReference()
+			Debug.Notification("Walking to "+ dstName)
+			bStopNotification = true
+			RegisterForCustomEvent(Self, "SceneStopped")
+			RegisterForRemoteEvent(MorsAW_Scene, "OnBegin")
+			RegisterForRemoteEvent(MorsAW_Scene, "OnEnd")
+			if MorsAW_Scene.IsPlaying()
+				GoToState("RESTARTING")
+			else
+				GoToState("STARTING")
+			endIf
+		endif
+		return
+    elseif resultCode == ThreatDetectorScript.AWR_WAIT_TIMEOUT()
+    else ; AWR_WAIT_INTERRUPTED
+    endif
+	Debug.MessageBox("AutoWalk\n\nPlayer is in combat!\nPlease clear all threats or move to a\nsafe location before start.")
+	Debug.Trace("AutoWalk: StartWalking(): Combat State is not clear or resumed, not starting walking.", 1)
+endfunction
+
+; Begin AutoWalk after checking combat state and clearing possible lingering combat state.
+bool function StartWalking()
+	if DstMarker.GetReference() == none
+		Debug.Notification("AutoWalk: No destination selected! Cannot start walking.")
+		return false
+	endif
+	if(ThreatDetectorScript.BeginCombatClearWait(self as Quest, "OnCombatClearWaitResult")) == false
+		; if already waiting stop existing wait
+		Debug.Notification("AutoWalk: Previous walking attempt cancelled.")
+		ThreatDetectorScript.CancelCombatClearWait()
+		return false
+	endif
+
+	return true
 endFunction
 
 function ReservePlayer()
@@ -516,6 +538,7 @@ event actor.OnCombatStateChanged(actor _actor, actor _target, int _state)
 		elseIf _state == 1
 			
 			if bCombatWarning
+				Debug.trace("AutoWalk: OnCombatStateChanged: state=" + _state, 1)
 				CheckCombatStateAndStop(True)
 			endif
 		elseIf _state == 2
@@ -653,7 +676,8 @@ state STOPPING
 	Debug.trace("AutoWalk: OnBeginState(STOPPING)", 1)
 	Debug.trace("AutoWalk: OnBeginState(STOPPING): Canceling Timer...", 1)
 	CancelTimer(TimerCheckArrival)
-		
+	ThreatDetectorScript.CancelCombatClearWait()
+
 	if MorsAW_Scene.IsPlaying()
 		Debug.trace("AutoWalk: OnBeginState(STOPPING): Calling MorsAW_Scene.Stop()...", 1)
 			MorsAW_Scene.Stop()
@@ -729,52 +753,52 @@ Function UpdateCustomDestination(AutoWalkMarkerDB:CustomDestinationMarkerInfo ma
 	endif
 
 	if markerInfo.nearestStaticMarkerDistance <= 3000
-	if !bOnlyDiscovered || markerInfo.nearestStaticMarker.IsMapMarkerVisible()
-		dstName = markerInfo.nearestStaticMarkerName
-	else
-		dstName = "Custom Destination"
-	endif
+		if !bOnlyDiscovered || markerInfo.nearestStaticMarker.IsMapMarkerVisible()
+			dstName = markerInfo.nearestStaticMarkerName
+		else
+			dstName = "Custom Destination"
+		endif
 
-	float X
-	float y
-	float Z
-	if markerInfo.nearestStaticMarkerHasFix
-		x = markerInfo.nearestStaticMarkerFixX
-		y = markerInfo.nearestStaticMarkerFixY
-		z = markerInfo.nearestStaticMarkerFixZ
-		Debug.Trace("AutoWalk: UpdateCustomDestination: nearestStaticMarkerHasFix=" + markerInfo.nearestStaticMarkerHasFix, 1)
-	else
-		x = markerInfo.nearestStaticMarker.x
-		y = markerInfo.nearestStaticMarker.y
-		z = markerInfo.nearestStaticMarker.z
-	endif
+		float X
+		float y
+		float Z
+		if markerInfo.nearestStaticMarkerHasFix
+			x = markerInfo.nearestStaticMarkerFixX
+			y = markerInfo.nearestStaticMarkerFixY
+			z = markerInfo.nearestStaticMarkerFixZ
+			Debug.Trace("AutoWalk: UpdateCustomDestination: nearestStaticMarkerHasFix=" + markerInfo.nearestStaticMarkerHasFix, 1)
+		else
+			x = markerInfo.nearestStaticMarker.x
+			y = markerInfo.nearestStaticMarker.y
+			z = markerInfo.nearestStaticMarker.z
+		endif
 
-	Debug.Trace("AutoWalk: UpdateCustomDestination: PlayerMarker updated to exact static marker \"" + markerInfo.nearestStaticMarkerName + "\"" + "(" + x as Int+ ", " + y as Int +", " + z as Int+ ")[" + markerInfo.nearestStaticMarker +"]", 1)
+		Debug.Trace("AutoWalk: UpdateCustomDestination: PlayerMarker updated to exact static marker \"" + markerInfo.nearestStaticMarkerName + "\"" + "(" + x as Int+ ", " + y as Int +", " + z as Int+ ")[" + markerInfo.nearestStaticMarker +"]", 1)
 
-	CurrentCustomDstMarker.SetPosition(x, y, z)
-	Debug.Trace("AutoWalk: UpdateCustomDestination: Before SetPlayerMapMarker: " + PlayerRef.GetWorldSpace() + "(" + x + ", " + y +", " + z+ ")", 1)
-	MarkerDBScript.SetPlayerMapMarker(PlayerRef.GetWorldSpace(), x, y, z)
-	; DstMarker.ForceRefTo(CurrentCustomDstMarker)
+		CurrentCustomDstMarker.SetPosition(x, y, z)
+		Debug.Trace("AutoWalk: UpdateCustomDestination: Before SetPlayerMapMarker: " + PlayerRef.GetWorldSpace() + "(" + x + ", " + y +", " + z+ ")", 1)
+		MarkerDBScript.SetPlayerMapMarker(PlayerRef.GetWorldSpace(), x, y, z)
+		; DstMarker.ForceRefTo(CurrentCustomDstMarker)
 	else
-	if !bOnlyDiscovered || markerInfo.nearestStaticMarker.IsMapMarkerVisible()
-		dstName = "(Near) " + markerInfo.nearestStaticMarkerName
-	else
-		dstName = "Custom Destination"
-	endif
-	Debug.Trace("AutoWalk: UpdateCustomDestination: PlayerMarker updated to \"(Near) " + markerInfo.nearestStaticMarkerName + "\"" + "(" + markerInfo.playerMarkerX as Int+ ", " + markerInfo.playerMarkerY as Int +", " + markerInfo.playerMarkerZ as Int+ ")", 1)
-	CurrentCustomDstMarker.SetPosition(markerInfo.playerMarkerX, markerInfo.playerMarkerY, markerInfo.playerMarkerZ)
-	; if markerInfo.playerMarkerCell == PlayerRef.GetParentCell()
-	;   ; 진입방향 맞추기
-	;   Debug.Trace("AutoWalk: UpdateCustomDestination: PlayerMarker angle " + "(" + CurrentCustomDstMarker.GetAngleX() as Int+ ", " + CurrentCustomDstMarker.GetAngleY() as Int +", " + CurrentCustomDstMarker.GetAngleZ() as Int+ ")", 1)
-	;   Debug.Trace("AutoWalk: UpdateCustomDestination: Player angle " + "(" + PlayerRef.GetAngleX() as Int+ ", " + PlayerRef.GetAngleY() as Int +", " + PlayerRef.GetAngleZ() as Int+ ")", 1)
-	;   Debug.Trace("AutoWalk: UpdateCustomDestination: MorsAW_PlayerMarker Parent Cell" + "[" + CurrentCustomDstMarker.GetParentCell() + "]", 1)
-	;   ; 동일 셀만 되는 것인지?
-	;   CurrentCustomDstMarker.TranslateTo(CurrentCustomDstMarker.GetPositionX(), CurrentCustomDstMarker.GetPositionY(), CurrentCustomDstMarker.GetPositionZ(), PlayerRef.GetAngleX(), PlayerRef.GetAngleY(), PlayerRef.GetAngleZ(), 40)
-	;   Debug.Trace("AutoWalk: UpdateCustomDestination: PlayerMarker angle " + "(" + CurrentCustomDstMarker.GetAngleX() as Int+ ", " + CurrentCustomDstMarker.GetAngleY() as Int +", " + CurrentCustomDstMarker.GetAngleZ() as Int+ ")", 1)
-	; endif
+		if !bOnlyDiscovered || markerInfo.nearestStaticMarker.IsMapMarkerVisible()
+			dstName = "(Near) " + markerInfo.nearestStaticMarkerName
+		else
+			dstName = "Custom Destination"
+		endif
+		Debug.Trace("AutoWalk: UpdateCustomDestination: PlayerMarker updated to \"(Near) " + markerInfo.nearestStaticMarkerName + "\"" + "(" + markerInfo.playerMarkerX as Int+ ", " + markerInfo.playerMarkerY as Int +", " + markerInfo.playerMarkerZ as Int+ ")", 1)
+		CurrentCustomDstMarker.SetPosition(markerInfo.playerMarkerX, markerInfo.playerMarkerY, markerInfo.playerMarkerZ)
+		; if markerInfo.playerMarkerCell == PlayerRef.GetParentCell()
+		;   ; 진입방향 맞추기
+		;   Debug.Trace("AutoWalk: UpdateCustomDestination: PlayerMarker angle " + "(" + CurrentCustomDstMarker.GetAngleX() as Int+ ", " + CurrentCustomDstMarker.GetAngleY() as Int +", " + CurrentCustomDstMarker.GetAngleZ() as Int+ ")", 1)
+		;   Debug.Trace("AutoWalk: UpdateCustomDestination: Player angle " + "(" + PlayerRef.GetAngleX() as Int+ ", " + PlayerRef.GetAngleY() as Int +", " + PlayerRef.GetAngleZ() as Int+ ")", 1)
+		;   Debug.Trace("AutoWalk: UpdateCustomDestination: MorsAW_PlayerMarker Parent Cell" + "[" + CurrentCustomDstMarker.GetParentCell() + "]", 1)
+		;   ; 동일 셀만 되는 것인지?
+		;   CurrentCustomDstMarker.TranslateTo(CurrentCustomDstMarker.GetPositionX(), CurrentCustomDstMarker.GetPositionY(), CurrentCustomDstMarker.GetPositionZ(), PlayerRef.GetAngleX(), PlayerRef.GetAngleY(), PlayerRef.GetAngleZ(), 40)
+		;   Debug.Trace("AutoWalk: UpdateCustomDestination: PlayerMarker angle " + "(" + CurrentCustomDstMarker.GetAngleX() as Int+ ", " + CurrentCustomDstMarker.GetAngleY() as Int +", " + CurrentCustomDstMarker.GetAngleZ() as Int+ ")", 1)
+		; endif
 
-	MarkerDBScript.SetPlayerMapMarker(PlayerRef.GetWorldSpace(), markerInfo.playerMarkerX,  markerInfo.playerMarkerY, markerInfo.playerMarkerZ)
-	; DstMarker.ForceRefTo(CurrentCustomDstMarker)
+		MarkerDBScript.SetPlayerMapMarker(PlayerRef.GetWorldSpace(), markerInfo.playerMarkerX,  markerInfo.playerMarkerY, markerInfo.playerMarkerZ)
+		; DstMarker.ForceRefTo(CurrentCustomDstMarker)
 	endif
 
 	if GetState() == "walking"
