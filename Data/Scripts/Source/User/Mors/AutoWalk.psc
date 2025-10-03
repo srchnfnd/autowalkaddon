@@ -101,8 +101,8 @@ struct locData
 	objectReference dstMarker
 endStruct
 
-int iMenu = 0 ; Stores the last used menu - 0:Categories, 1:Settlements, 2:Other
-form chosenItem = none ; selected destination (misc item), valid only right after destination has been selected, do not rely on this value after the choice has been processed
+;int iMenu = 0 ; Stores the last used menu - 0:Categories, 1:Settlements, 2:Other
+;form chosenItem = none ; selected destination (misc item), valid only right after destination has been selected, do not rely on this value after the choice has been processed
 string dstName = "" ; to store the name of the last selected destination (primary use in notification when resuming walking)
 int TimerMenuKeyDown = 10 ; ID of the hotkey timer
 CustomEvent SceneStopped ; Custom event we sent from scene.OnEnd() handlers
@@ -116,235 +116,101 @@ bool bPlayerInCombat = false
 bool bRegisteredCombatStateEvent = false
 float arrivalCheckInterval = 3.0
 
+bool bContinueWalkingToCustomMarker = false
+
 Mors:AutoWalkMarkerDB Property MarkerDBScript Auto const 
 Mors:AWR_ThreatDetector Property ThreatDetectorScript Auto const 
+Mors:AWR_DstMenu property AWR_DstMenuScript const auto
 
 function ShowMenu()
-	if Utility.IsInMenuMode() ; This shouldn't be true unless the Pipboy is open
-		RegisterForMenuOpenCloseEvent("PipboyMenu") ; Register for the PipboyMenu event in case the pipboy is now open, so we can retry this proces after it is closed.
-		Debug.Notification("Close the Pipboy please.")
-		return
-	endIf
 
-	; Register for the ContainerMenu so we can tell when player closes it
-	RegisterForMenuOpenCloseEvent("ContainerMenu")
 
 	; Determine where we are (Commonwealth/Nuka World/Far Harbor) and use appropriate function to display the menu
 	location _location = PlayerRef.GetCurrentLocation()
 	if DLC04NukaWorldLocation != none && _location == DLC04NukaWorldLocation || DLC04NukaWorldLocation.IsChild(_location)
-		if iMenu == 1 ; we dont use the 'Settlements' menu in Nuka World, so let's make sure iMenu value is reset to 0 to show the category choice
-			iMenu = 0
-		endIf
-		iWorldSpace = 2
+
+		iWorldSpace = AWR_DstMenuScript.AWR_WORLDSPACE_NUKAWORLD()
 	elseIf DLC03FarHarborWorldLocation != none && _location == DLC03FarHarborWorldLocation || DLC03FarHarborWorldLocation.IsChild(_location)
-		if iMenu == 1 ; we dont use the 'Settlements' menu in Far Harbor, so let's make sure iMenu value is reset to 0 to show the category choice
-			iMenu = 0
-		endIf
-		iWorldSpace = 1
+
+		iWorldSpace = AWR_DstMenuScript.AWR_WORLDSPACE_FARHARBOR()
 	else
-		iWorldSpace = 0
+		iWorldSpace = AWR_DstMenuScript.AWR_WORLDSPACE_COMMONWEALTH()
 	endIf
 
-	; Add/Remove menu items depending on the availability of their map markers
-	FilterMenuItems(iMenu)
+	AWR_DstMenuScript.OnGameReload() ; temporary measure until mod clean install and AWR_DstMenu.OnQuestInit() works
 
-	MorsAW_ContainerREF.Activate(PlayerRef)
+	ScriptObject receiver = self as ScriptObject
+	Var[] args = new Var[4]
+  	args[0] = receiver as Var
+  	args[1] = "OnDestinationSelect" as Var
+  	args[2] = iWorldSpace as Var
+  	args[3] = bOnlyDiscovered as Var
+
+	AWR_DstMenuScript.CallFunctionNoWait("Open", args)
+
 endFunction
 
-function FilterMenuItems(int _iMenu)
-	
-	UnregisterForRemoteEvent(MorsAW_ContainerREF, "OnItemRemoved")
-	RemoveAllInventoryEventFilters()
-	MorsAW_ContainerREF.RemoveAllItems()
-	; 2019-10-30: moved the following three lines from the end up to here, because sometimes ppl "select" something before all
-	;   options were added, before these lines were processed, before we started listening for OnItemRemoved,
-	;   which resulted in roken functionality and the "choice" items staying in peoples inventory.
-	chosenItem = none
-  iMenu = _iMenu
-	RegisterForRemoteEvent(MorsAW_ContainerREF, "OnItemRemoved")
-
-	; Settlements
-	if _iMenu == 1
-		AddInventoryEventFilter(MorsAW_ListSettlements)
-		int _i = 0
-		while _i < Settlements.Length
-			if !bOnlyDiscovered || Settlements[_i].marker == none || Settlements[_i].marker.IsMapMarkerVisible()
-				MorsAW_ContainerREF.AddItem(Settlements[_i].miscItem, 1)
-			endIf
-			_i = _i + 1
-		endWhile
-
-	; Other A-M
-	elseIf _iMenu == 2
-		locData[] _data
-		if iWorldSpace == 0 ; Commonwealth
-			AddInventoryEventFilter(MorsAW_ListOtherAM)
-			_data = OtherAM
-		elseIf iWorldSpace == 1 ; Far Harbor
-			AddInventoryEventFilter(MorsAW_ListOtherAM_FarHarbor)
-			_data = OtherAM_FarHarbor
-		elseIf iWorldSpace == 2 ; Nuka World
-			AddInventoryEventFilter(MorsAW_ListOtherAM_NukaWorld)
-			_data = OtherAM_NukaWorld
+function dumpLocData()
+	locData[] debugData = SUP_F4SE.MergeArrays(OtherAM_NukaWorld as var[], OtherNZ_NukaWorld as var[]) as locData[]
+	;extract data for data source generation of Entries_Commonwealth, Entries_FarHarbor, Entries_NukaWorld
+	int i = 0
+	while debugData.length > i
+		ObjectReference ref = debugData[i].marker
+		if ref == none
+			ref = debugData[i].dstMarker
 		endIf
-		int _i = 0
-		int _limit = _data.length
-		while _i < _limit
-			if !bOnlyDiscovered || Settlements[_i].marker == none || _data[_i].marker.IsMapMarkerVisible()
-				MorsAW_ContainerREF.AddItem(_data[_i].miscItem, 1)
-			endIf
-			_i = _i + 1
-		endWhile
-
-	; Other N-Z
-	elseIf _iMenu == 3
-		locData[] _data
-		if iWorldSpace == 0 ; Commonwealth
-			AddInventoryEventFilter(MorsAW_ListOtherNZ)
-			_data = OtherNZ
-		elseIf iWorldSpace == 1 ; Far Harbor
-			AddInventoryEventFilter(MorsAW_ListOtherNZ_FarHarbor)
-			_data = OtherNZ_FarHarbor
-		elseIf iWorldSpace == 2 ; Nuka World
-			AddInventoryEventFilter(MorsAW_ListOtherNZ_NukaWorld)
-			_data = OtherNZ_NukaWorld
+		string name = SUP_F4SE.MapMarkerGetName(ref)
+		if !name
+			name = debugData[i].miscItem.GetName()
 		endIf
-		int _i = 0
-		int _limit = _data.length
-		while _i < _limit
-			if !bOnlyDiscovered || Settlements[_i].marker == none || _data[_i].marker.IsMapMarkerVisible()
-				MorsAW_ContainerREF.AddItem(_data[_i].miscItem, 1)
-			endIf
-			_i = _i + 1
-		endWhile
-
-	; Categories (using the categories also as a fallback, just in case)
-	else
-		if iWorldSpace == 0 ; Commonwealth
-			AddInventoryEventFilter(MorsAW_ListCategories)
-			MorsAW_ContainerREF.AddItem(MorsAW_MnuSettlements, 1)
-			MorsAW_ContainerREF.AddItem(MorsAW_MnuOtherAM, 1)
-			MorsAW_ContainerREF.AddItem(MorsAW_MnuOtherNZ, 1)
-			MorsAW_ContainerREF.AddItem(MorsAW_MenuCustomDestination, 1, False)
-		elseIf iWorldSpace == 1 ; Far Harbor
-			AddInventoryEventFilter(MorsAW_ListCategories_FarHarbor)
-			MorsAW_ContainerREF.AddItem(MorsAW_MnuOtherAM_FarHarbor, 1)
-			MorsAW_ContainerREF.AddItem(MorsAW_MnuOtherNZ_FarHarbor, 1)
-			MorsAW_ContainerREF.AddItem(MorsAW_MenuCustomDestination, 1, False)
-		elseIf iWorldSpace == 2 ; Nuka World
-			AddInventoryEventFilter(MorsAW_ListCategories_NukaWorld)
-			MorsAW_ContainerREF.AddItem(MorsAW_MnuOtherAM_NukaWorld, 1)
-			MorsAW_ContainerREF.AddItem(MorsAW_MnuOtherNZ_NukaWorld, 1)
-			MorsAW_ContainerREF.AddItem(MorsAW_MenuCustomDestination, 1, False)
+		String markerFormID = ""
+		String dstMarkerFormID = ""
+		if debugData[i].dstMarker
+			dstMarkerFormID = GardenOfEden.IntToHex(debugData[i].dstMarker.GetFormId(), false)
+		else
+			dstMarkerFormID = ""
 		endIf
-	endIf
-
-	; 2019-10-30: moved the following to the beginning, because sometimes ppl "select" something before all options were added,
-	;   before these lines were processed, before we started listening for OnItemRemoved, which resulted in roken functionality
-	;   and the "choice" items staying in peoples inventory.
-	;chosenItem = none
-	;iMenu = _iMenu
-	;RegisterForRemoteEvent(MorsAW_ContainerREF, "OnItemRemoved")
-endFunction
-
-event objectReference.OnItemRemoved(objectReference _sender, form _itemForm, int _count, objectReference _itemRef, objectReference _dstContainerRef)
-	if _sender == MorsAW_ContainerREF ; TODO: this might be really needed later if we reg for more containers at once? consider removing for now.
-		if _dstContainerRef == PlayerRef
-			;PlayerRef.RemoveItem(_itemForm, _count, true, MorsAW_ContainerREF)
-			PlayerRef.RemoveItem(_itemForm, _count, true)
-			MorsAW_ContainerREF.AddItem(_itemForm, _count)
-			
-			if iMenu == 0 ; Category selection
-				if _itemForm == MorsAW_MnuSettlements
-					FilterMenuItems(1)
-				elseIf _itemForm == MorsAW_MnuOtherAM || _itemForm == MorsAW_MnuOtherAM_FarHarbor || _itemForm == MorsAW_MnuOtherAM_NukaWorld
-					FilterMenuItems(2)
-				elseIf _itemForm == MorsAW_MnuOtherNZ || _itemForm == MorsAW_MnuOtherNZ_FarHarbor || _itemForm == MorsAW_MnuOtherNZ_NukaWorld
-					FilterMenuItems(3)
-				elseIf _itemForm == MorsAW_MenuCustomDestination
-					chosenItem = _itemForm
-				endIf
-			else
-				if _itemForm == MorsAW_MnuSettlements || _itemForm == MorsAW_MnuOtherAM || _itemForm == MorsAW_MnuOtherNZ
-					FilterMenuItems(0)
-				elseIf _itemForm == MorsAW_MnuOtherAM_FarHarbor || _itemForm == MorsAW_MnuOtherAM_NukaWorld
-					FilterMenuItems(0)
-				elseIf _itemForm == MorsAW_MnuOtherNZ_FarHarbor || _itemForm == MorsAW_MnuOtherNZ_NukaWorld
-					FilterMenuItems(0)
-				else
-					; TODO: Can we close the inventory by script and call ProcessChoice() from here?
-					chosenItem = _itemForm
-				endIf
-			endIf
+		if ref
+			markerFormID = GardenOfEden.IntToHex(ref.GetFormId(), false)
+		else
+			markerFormID = ""
 		endIf
-	endIf
-endEvent
+		Debug.Trace( markerFormID + "," + dstMarkerFormID + "," + name, 1)
+		i = i + 1
+	endWhile
+	return
+endfunction
 
-event OnMenuOpenCloseEvent(string _menu, bool _opening)
-	;
-	if _menu == "PipboyMenu" && !_opening					; Pipboy is closing - we must have been waiting for that before trying to ShowMenu(), so lets do that.
-		UnregisterForMenuOpenCloseEvent("PipboyMenu")
-		Utility.Wait(0.2)									; Seems like we must wait for the menu to completely close, otherwise the container activation doesn't seem to work.
-		ShowMenu()
-	elseIf _menu == "ContainerMenu" && !_opening			; Container menu is closing - unregister from ContainerMenu event and handle the choice (TODO)
-		UnregisterForMenuOpenCloseEvent("ContainerMenu")
-		UnregisterForMenuOpenCloseEvent("PipboyMenu")		; just in case things get messed up, unreg from Pipboy menu too
-		if !chosenItem
-			Debug.Notification("AutoWalk: No destination selected!")
-		endif
-		ProcessChoice()
-	endIf
-endEvent
-
-function ProcessChoice()
-	UnregisterForRemoteEvent(MorsAW_ContainerREF, "OnItemRemoved")
-	if chosenItem
-		locData[] _items
-		if iMenu == 0 ; Categories
-			
-			if chosenItem == MorsAW_MenuCustomDestination
-				CurrentCustomDstMarker = GetCustomDstMarker()
-				Debug.Trace("AutoWalk: ProcessChoice: marker=" + CurrentCustomDstMarker, 1)
-				if CurrentCustomDstMarker
-					dstName = "Custom Destination"
-					StartWalkingToCustomMarker(CurrentCustomDstMarker)
-				endif
+function OnDestinationSelect(int callback_type, var [] args)
+	Debug.Trace("AutoWalk: OnDestinationSelect(): callback_type=" + callback_type + ", args=" + args, 1)
+	AWR_DstMenuScript.CallFunctionNoWait("Close", None)
+	if callback_type == AWR_DstMenuScript.AWR_CALLBACK_TYPE_DSTENTRY()
+		AWR_DstMenu:DstEntry entry = args[0] as AWR_DstMenu:DstEntry
+		if entry == None
+			; custom destination
+			CurrentCustomDstMarker = GetCustomDstMarker()
+			Debug.Trace("AutoWalk: OnDestinationSelect: custom marker=" + CurrentCustomDstMarker, 1)
+			if CurrentCustomDstMarker
+				dstName = "Custom Destination"
+				StartWalkingToCustomMarker(CurrentCustomDstMarker)
+				bContinueWalkingToCustomMarker = true
 			endif
-			return
-		elseIf iMenu == 1 ; Settlements
-			_items = Settlements
-		elseIf iMenu == 2 ; Other A-M
-			if iWorldSpace == 1 ; Far Harbor
-				_items = OtherAM_FarHarbor
-			elseIf iWorldSpace == 2 ; Nuka World
-        _items = OtherAM_NukaWorld
+		else
+			; arg is DstEntry
+			bContinueWalkingToCustomMarker = false
+			Debug.Trace("AutoWalk: OnDestinationSelect: entry=" + entry, 1)
+			dstName = entry.name
+			if entry.dstMarker
+				DstMarker.ForceRefTo(entry.dstMarker)
 			else
-				_items = OtherAM
+				DstMarker.ForceRefTo(entry.marker)
 			endIf
-		elseIf iMenu == 3 ; Other N-Z
-			if iWorldSpace == 1 ; Far Harbor
-				_items = OtherNZ_FarHarbor
-			elseIf iWorldSpace == 2 ; Nuka World
-				_items = OtherNZ_NukaWorld
-			else
-        _items = OtherNZ
-			endIf
-		endIf
-		int _i = _items.Length
-		while _i > 0
-			_i = _i - 1
-			if _items[_i].miscItem == chosenItem
-				dstName = chosenItem.GetName()
-				; force the map marker (or the assigned fallback marker) into an alias, serving as destination for the travel package
-				if _items[_i].dstMarker
-          DstMarker.ForceRefTo(_items[_i].dstMarker)
-				else
-					DstMarker.ForceRefTo(_items[_i].marker)
-				endIf
-				StartWalking()
-				return
-			endIf
-		endWhile
+			StartWalking()
+		endif
+	elseIf callback_type == AWR_DstMenuScript.AWR_CALLBACK_TYPE_CANCEL()
+		Debug.Trace("AutoWalk: OnDestinationSelect: user cancelled or error occurred", 1)
+	else
+		Debug.Trace("AutoWalk: OnDestinationSelect: unknown callback_type: " + callback_type, 1)
 	endIf
 endFunction
 
@@ -355,7 +221,9 @@ function StartWalkingToCustomMarker(ObjectReference staticMarker)
 EndFunction
 
 event OnControlUp(string _ctl, float _time)
+	Debug.Trace("AutoWalk: OnControlUp(): key=" + _ctl + ", time=" + _time, 1)
 	if _ctl == "MorsAutoWalkHotkey1"
+		; temporary measure to register for combat state change event until clean install of mod and OnQuestInit() works
 		if bRegisteredCombatStateEvent == False
 			Self.RegisterForRemoteEvent(PlayerRef, "OnCombatStateChanged")
 			Debug.Trace("AutoWalk: OnControlUp: registering combat state event", 1)
@@ -368,10 +236,8 @@ event OnControlUp(string _ctl, float _time)
 				bStopNotification = false
 				GoToState("STOPPING")
 				;StopWalking()
-			elseif !chosenItem
-				ShowMenu()
 			else
-				if chosenItem == MorsAW_MenuCustomDestination
+				if bContinueWalkingToCustomMarker == MorsAW_MenuCustomDestination
 					CurrentCustomDstMarker = GetCustomDstMarker()
 					Debug.Trace("AutoWalk: OnControlUp: marker=" + CurrentCustomDstMarker, 1)
 					if CurrentCustomDstMarker
@@ -387,6 +253,7 @@ event OnControlUp(string _ctl, float _time)
 endEvent
 
 event OnControlDown(string _ctl)
+	Debug.Trace("AutoWalk: OnControlDown(): key=" + _ctl, 1)
 	if _ctl == "MorsAutoWalkHotkey1"
 		if !DstMarker.GetReference()
 			
@@ -463,7 +330,7 @@ function OnCombatClearWaitResult(int resultCode)
     elseif resultCode == ThreatDetectorScript.AWR_WAIT_TIMEOUT()
     else ; AWR_WAIT_INTERRUPTED
     endif
-	Debug.MessageBox("AutoWalk\n\nPlayer is in combat!\nPlease clear all threats or move to a\nsafe location before start.")
+	Debug.MessageBox("AutoWalk\n\nPlayer is in combat!\nClear all threats,\nsneak until enemies calm down,\nor move to a safe location before starting.")
 	Debug.Trace("AutoWalk: StartWalking(): Combat State is not clear or resumed, not starting walking.", 1)
 endfunction
 
