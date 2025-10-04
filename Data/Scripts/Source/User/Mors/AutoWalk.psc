@@ -148,21 +148,25 @@ function ShowMenu()
 
 	AWR_DstMenuScript.CallFunctionNoWait("Open", args)
 
+	; Debug.Trace("============= Commonwealth Settlements ============")
+	; dumpLocData(Settlements)
+	; Debug.Trace("============= Commonwealth Other ============")
+	; dumpLocData(OtherAM)
+	; dumpLocData(OtherNZ)
+	; Debug.Trace("============= Far Harbor Other ============")
+	; dumpLocData(OtherAM_FarHarbor)
+	; dumpLocData(OtherNZ_FarHarbor)
+	; Debug.Trace("============= Nuka World Other ============")
+	; dumpLocData(OtherAM_NukaWorld)
+	; dumpLocData(OtherNZ_NukaWorld)
 endFunction
 
-function dumpLocData()
-	locData[] debugData = SUP_F4SE.MergeArrays(OtherAM_NukaWorld as var[], OtherNZ_NukaWorld as var[]) as locData[]
+function dumpLocData(locData[] debugData)
+	;locData[] debugData = SUP_F4SE.MergeArrays(OtherAM_NukaWorld as var[], OtherNZ_NukaWorld as var[]) as locData[] <= broken
 	;extract data for data source generation of Entries_Commonwealth, Entries_FarHarbor, Entries_NukaWorld
 	int i = 0
 	while debugData.length > i
-		ObjectReference ref = debugData[i].marker
-		if ref == none
-			ref = debugData[i].dstMarker
-		endIf
-		string name = SUP_F4SE.MapMarkerGetName(ref)
-		if !name
-			name = debugData[i].miscItem.GetName()
-		endIf
+		string name = debugData[i].miscItem.GetName()
 		String markerFormID = ""
 		String dstMarkerFormID = ""
 		if debugData[i].dstMarker
@@ -170,8 +174,8 @@ function dumpLocData()
 		else
 			dstMarkerFormID = ""
 		endIf
-		if ref
-			markerFormID = GardenOfEden.IntToHex(ref.GetFormId(), false)
+		if debugData[i].marker
+			markerFormID = GardenOfEden.IntToHex(debugData[i].marker.GetFormId(), false)
 		else
 			markerFormID = ""
 		endIf
@@ -477,7 +481,6 @@ state STARTING
 		SendCustomEvent("SceneStopped", None)
 	endEvent
 	event Mors:AutoWalk.SceneStopped(Mors:AutoWalk _sender, Var[] _args)
-		Debug.trace("AutoWalk: SceneStopped(STARTING): Calling CombatAlertAndStop()...", 1)
 		; Scene stopped immediately, and we need to clean up to avoid player locking up.
 		Debug.trace("AutoWalk: SceneStopped(STARTING): Calling CheckCombatStateAndStop(True)...", 1)
 		CheckCombatStateAndStop(True)
