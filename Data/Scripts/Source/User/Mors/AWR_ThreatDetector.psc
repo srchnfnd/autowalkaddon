@@ -263,6 +263,7 @@ bool Function BeginCombatClearWait(Quest callbackQuest, String callbackFunc)
   _lastCombatRTS  = _startRTS ; assume in combat at start to require a stable window
   _lastHitRTS = -1000.0
   LastPingRTS = 0.0
+  _lastToastRTS = 0.0
   _ignoreThreatsUntil = 0.0
 
   StableSeconds = AWR_StableFirst

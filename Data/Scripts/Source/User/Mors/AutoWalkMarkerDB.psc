@@ -191,6 +191,10 @@ Event Actor.OnPlayerLoadGame(Actor sender)
       return
     endif
   endif
+  ; update user map marker usedList and spareList from json files for current worldspace
+  ; this is needed because FormList does not persist its contents across save/load
+  RefreshUserMapMarkerUsedList()
+  RefreshUserMapMarkersForMCM()
 EndEvent
 
 Event OnInit()
@@ -206,8 +210,13 @@ EndFunction
 
 Function OnCellChange(Cell newCell)
   Debug.Trace("AutoWalk: OnCellChange: Cell=" + newCell, 1)
-  GetPlayerWorldSpace()
-  SendUpdateCustomDestination()
+  ; only if we have a pending custom destination marker to update
+  if currentDestinationMarkerInfo != None && currentDestinationMarkerInfo.playerMarkerZProbed == false
+    GetPlayerWorldSpace()
+    SendUpdateCustomDestination()
+  Else
+    Debug.Trace("AutoWalk: OnCellChange: No pending custom destination marker to update.", 1)
+  endif
 EndFunction
 
 ; ======================
@@ -695,7 +704,12 @@ Function CalibrateCustomDestinationMarker()
       Debug.Trace("AutoWalk: nearestStaticMarkerHasFix=" + dstInfo.nearestStaticMarkerHasFix, 1)
     endif
 
-    String name = LoadUserMapMarkerName(nearestMarker)
+    String name
+    UserMapMarker umk = LoadUserMapMarkerInfo(nearestMarker)
+    ; if it's a user map marker, use its custom name
+    if umk
+      name = umk.name
+    endif
     if !name
       name = SUP_F4SE.MapMarkerGetName(nearestMarker)
     endif
@@ -765,55 +779,14 @@ EndFunction
 ; === USER MAP MARKER MANAGEMENT ===
 ; ==================================
 
-; Opens a dialog to add the player's current position as a new user map marker.
-Function AddCurrentPositionToUserMarkerDB()
-  TIM:TIM.Open(1, "Enter a name for the new user map marker:", "", 2)
-  RegisterForExternalEvent("TIM::Accept", "OnSetUserMarkerName")
-  RegisterForExternalEvent("TIM::Cancel", "OnNoSetUserMarkerName")
-EndFunction
+struct UserMapMarker
+  String name
+  float X
+  float Y
+  float Z
+EndStruct
 
-; Handles the event when the user sets a name for a new user map marker.
-Function OnSetUserMarkerName(string markerName)
-  UnRegisterForExternalEvent("TIM::Accept")
-  UnRegisterForExternalEvent("TIM::Cancel")
-
-  if markerName == ""
-    return
-  endif
-
-  int cellIndex = -1
-  WorldSpace ws = GetPlayerWorldSpace()
-  GridCell[] cells = None
-  ; TODO: DiamondCity, GoodNeighbor, SanctuaryHillsWorld
-  if ws == WorldSpaceCommonwealth
-    cellIndex = GetContainingCellIndex(GridCommonwealth, PlayerRef.x, PlayerRef.y)
-    cells = GridCellsCommonwealth
-  elseif ws == WorldSpaceFarHarbor
-    cellIndex = GetContainingCellIndex(GridFarHarbor, PlayerRef.x, PlayerRef.y)
-    cells = GridCellsFarHarbor
-  elseif ws == WorldSpaceNukaWorld
-    cellIndex = GetContainingCellIndex(GridNukaWorld, PlayerRef.x, PlayerRef.y)
-    cells = GridCellsNukaWorld
-  endif
-
-  ObjectReference spareMarker = GetUnusedUserMapMarker(ws)
-  if spareMarker
-    SetUserMapMarkerUsed(ws, spareMarker)
-    spareMarker.SetPosition(PlayerRef.x, PlayerRef.y, PlayerRef.z)
-    SUP_F4SE.MapMarkerSetName(spareMarker, markerName)
-    SaveUserMapMarkerName(spareMarker, markerName)
-    cells[cellIndex].markers.AddForm(spareMarker)
-    spareMarker.Enable()
-    Debug.Notification("AutoWalk: New user map marker added: " + SUP_F4SE.MapMarkerGetName(spareMarker))
-  endif
-EndFunction
-
-; Handles the event when the user cancels naming a new user map marker.
-Function OnNoSetUserMarkerName(string markerName)
-  Debug.MessageBox("User marker name entry was cancelled: " + markerName)
-  UnRegisterForExternalEvent("TIM::Accept")
-  UnRegisterForExternalEvent("TIM::Cancel")
-EndFunction
+bool gDisplayUserMarkers = false
 
 ; Returns the spare and used user marker lists for the given worldspace.
 FormList[] Function GetUserMapMarkerLists(WorldSpace ws)
@@ -1009,40 +982,147 @@ int Function GetMcmUserMapMarkerSlotCount()
   return 30
 EndFunction
 
+
 ; Saves the name for a user map marker to a JSON file.
-Function SaveUserMapMarkerName(ObjectReference marker, String name)
+Function SaveUserMapMarkerInfo(ObjectReference marker, String name)
   string formIdStr = MyFormIdHexStr(marker.GetFormId())
   string worldSpaceStr = WorldSpaceToString(marker.GetWorldSpace())
   string fileName = "Data/Mors Auto Walk/UserMarker_" + worldSpaceStr + ".json"
   int rc = SUP_F4SE.JSONSetValueString(fileName, formIdStr + "_name", name, 0)
-  Debug.Trace("AutoWalk: SaveUserMapMarkerName: JSONSetValueString() returned " + rc, 1)
+  ; SUP_F4SE.JSONAppendValueFloat does not work
+  rc = SUP_F4SE.JSONSetValueFloat(fileName, formIdStr + "_x", marker.x, 0) 
+  rc = SUP_F4SE.JSONSetValueFloat(fileName, formIdStr + "_y", marker.y, 0)
+  rc = SUP_F4SE.JSONSetValueFloat(fileName, formIdStr + "_z", marker.z, 0)
 EndFunction
 
 ; Loads the name for a user map marker from a JSON file.
-String Function LoadUserMapMarkerName(ObjectReference marker)
+UserMapMarker Function LoadUserMapMarkerInfo(ObjectReference marker)
   string formIdStr = MyFormIdHexStr(marker.GetFormId())
   string worldSpaceStr = WorldSpaceToString(marker.GetWorldSpace())
   string fileName = "Data/Mors Auto Walk/UserMarker_" + worldSpaceStr + ".json"
   string keyStr = formIdStr + "_name"
-  Debug.Trace("AutoWalk: LoadUserMapMarkerName: key= " + keyStr + ", fileName=" + fileName, 1)
   SUP_F4SE:JSONValue jsval = SUP_F4SE.JSONGetValue(fileName, keyStr, 0)
-  Debug.Trace("AutoWalk: LoadUserMapMarkerName: JSONGetValueString() returned " + jsval, 1)
-  return jsval.JSONsValue
+  if !jsval || jsval.JSONsValue == ""
+    return None
+  endif
+  keyStr = formIdStr + "_position"
+  SUP_F4SE:JSONValue jsX = SUP_F4SE.JSONGetValue(fileName, formIdStr + "_x", 0)
+  SUP_F4SE:JSONValue jsY = SUP_F4SE.JSONGetValue(fileName, formIdStr + "_y", 0)
+  SUP_F4SE:JSONValue jsZ = SUP_F4SE.JSONGetValue(fileName, formIdStr + "_z", 0)
+  if !jsX || !jsY || !jsZ || (jsX.JSONfValue == 0.0 && jsY.JSONfValue == 0.0 && jsZ.JSONfValue == 0.0)
+    return None
+  endif
+  UserMapMarker ret = new UserMapMarker
+  ret.name = jsval.JSONsValue
+  ret.X = jsX.JSONfValue
+  ret.Y = jsY.JSONfValue
+  ret.Z = jsZ.JSONfValue
+  return ret
+EndFunction
+
+Function AddUserMapMarker(string markerName)
+  WorldSpace ws
+  ws = Game.GetPlayer().GetWorldSpace()
+ ; Check player is not in an in-door cell
+  if ws == None || (ws != WorldSpaceCommonwealth && ws != WorldSpaceFarHarbor && ws != WorldSpaceNukaWorld)
+    Debug.Notification("AutoWalk: Cannot add user map marker while indoors.")
+    return
+  endif
+
+  ws = GetPlayerWorldSpace()
+  GridCell cell_ = GetContainingGridCell(PlayerRef.x, PlayerRef.y, ws)
+  ObjectReference spareMarker = GetUnusedUserMapMarker(ws)
+
+  if spareMarker
+    SetUserMapMarkerUsed(ws, spareMarker)
+    spareMarker.SetPosition(PlayerRef.x, PlayerRef.y, PlayerRef.z)
+    SUP_F4SE.MapMarkerSetName(spareMarker, markerName)
+    SaveUserMapMarkerInfo(spareMarker, markerName)
+    cell_.markers.AddForm(spareMarker)
+    if gDisplayUserMarkers
+      spareMarker.Enable()
+    else
+      spareMarker.Disable()
+    endif
+    Debug.Notification("AutoWalk: New user map marker added: " + SUP_F4SE.MapMarkerGetName(spareMarker))
+  else
+    Debug.Notification("AutoWalk: Unable to add new user map marker; no spare markers available.")
+  endif
 EndFunction
 
 ; Deletes the name for a user map marker from the JSON file.
-Function DeleteUserMapMarkerName(ObjectReference marker)
+Function RemoveUserMapMarker(ObjectReference marker)
   string formIdStr = MyFormIdHexStr(marker.GetFormId())
   string worldSpaceStr = WorldSpaceToString(marker.GetWorldSpace())
   string fileName = "Data/Mors Auto Walk/UserMarker_" + worldSpaceStr + ".json"
   string keyStr = formIdStr + "_name"
   SUP_F4SE.JSONSetValueString(fileName, formIdStr + "_name", "", 0)
+  SUP_F4SE.JSONSetValueFloat(fileName, formIdStr + "_x", 0.0, 0)
+  SUP_F4SE.JSONSetValueFloat(fileName, formIdStr + "_y", 0.0, 0)
+  SUP_F4SE.JSONSetValueFloat(fileName, formIdStr + "_z", 0.0, 0)
   ; Note: SUP_F4SE.JSONEraseKey(fileName, keyStr, 0) causes crash-to-desktop (CtoD)
 EndFunction
 
+GridCell Function GetContainingGridCell(float x, float y, WorldSpace ws)
+  GridCell[] cells = None
+  int index = -1
+  if ws == WorldSpaceCommonwealth
+    cells = GridCellsCommonwealth
+    index = GetContainingCellIndex(GridCommonwealth, x, y)
+  elseif ws == WorldSpaceFarHarbor
+    cells = GridCellsFarHarbor
+    index = GetContainingCellIndex(GridFarHarbor, x, y)
+  elseif ws == WorldSpaceNukaWorld
+    cells = GridCellsNukaWorld
+    index = GetContainingCellIndex(GridNukaWorld, x, y)
+  endif
+  if index >= 0 && index < cells.Length
+    return cells[index]
+  endif
+  return None
+EndFunction
+
+Function RefreshUserMapMarkerUsedList()
+  Debug.Trace("AutoWalk: RefreshUserMapMarkerUsedList() called...", 1)
+  FormList[] lists = GetUserMapMarkerLists(GetPlayerWorldSpace())
+  FormList spareList = lists[0]
+  FormList usedList = lists[1]
+  ; Clear the used list and rebuild it from the database
+  usedList.revert()
+  int i = 0
+  while i < spareList.GetSize()
+    ObjectReference marker = spareList.GetAt(i) as ObjectReference
+    UserMapMarker umk = LoadUserMapMarkerInfo(marker)
+    if umk
+      marker.SetPosition(umk.X, umk.Y, umk.Z)
+      SUP_F4SE.MapMarkerSetName(marker, umk.name)
+      usedList.AddForm(marker)
+      ; check cell and add to database if needed
+      GridCell cell_ = GetContainingGridCell(marker.x, marker.y, GetPlayerWorldSpace())
+      if cell_ && !cell_.markers.HasForm(marker)
+        cell_.markers.AddForm(marker)
+        Debug.Trace("AutoWalk: RefreshUserMapMarkerUsedList(): added marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " to database", 1)
+      endif
+      if gDisplayUserMarkers
+        marker.Enable()
+      endif
+      Debug.Trace("AutoWalk: RefreshUserMapMarkerUsedList(): added marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " with name " + umk.name + " to used list", 1)
+    else
+      ; remove from cell database if present
+      GridCell cell_ = GetContainingGridCell(marker.x, marker.y, GetPlayerWorldSpace())
+      if cell_ && cell_.markers.HasForm(marker)
+        cell_.markers.RemoveAddedForm(marker)
+        Debug.Trace("AutoWalk: RefreshUserMapMarkerUsedList(): removed marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " from database", 1)
+      endif
+      marker.Disable()
+    endif
+    i += 1
+  endwhile
+EndFunction
+
 ; Refreshes the user map marker list in the MCM.
-Function RefreshUserMapMarkers()
-  Debug.Trace("AutoWalk: RefreshUserMapMarkers() called...", 1)
+Function RefreshUserMapMarkersForMCM()
+  Debug.Trace("AutoWalk: RefreshUserMapMarkersForMCM() called...", 1)
   int idx = 0
   while idx < GetMcmUserMapMarkerSlotCount()
     SetMcmUserMapMarkerSlot(idx, "")
@@ -1052,20 +1132,24 @@ Function RefreshUserMapMarkers()
   FormList[] lists = GetUserMapMarkerLists(GetPlayerWorldSpace())
   FormList usedList = lists[1]
   if usedList
-    Debug.Trace("AutoWalk: RefreshUserMapMarkers(): world=" + GetPlayerWorldSpace() + " usedList=" + usedList + ", size=" + usedList.GetSize(), 1)
+    Debug.Trace("AutoWalk: RefreshUserMapMarkersForMCM(): world=" + GetPlayerWorldSpace() + " usedList=" + usedList + ", size=" + usedList.GetSize(), 1)
     idx = 0
     while idx < Math.Min(usedList.GetSize(), GetMcmUserMapMarkerSlotCount())
       ObjectReference marker = usedList.GetAt(idx) as ObjectReference
-      String val = LoadUserMapMarkerName(marker)
-      if !val
-        val = SUP_F4SE.MapMarkerGetName(marker)
+      string name = ""
+      UserMapMarker umk = LoadUserMapMarkerInfo(marker)
+      if umk
+        name = umk.name
       endif
-      Debug.Trace("AutoWalk: RefreshUserMapMarkers(): markerName=" + val, 1)
-      SetMcmUserMapMarkerSlot(idx, val)
+      if !name || name == ""
+        name = SUP_F4SE.MapMarkerGetName(marker)
+      endif
+      Debug.Trace("AutoWalk: RefreshUserMapMarkersForMCM(): markerName=" + name, 1)
+      SetMcmUserMapMarkerSlot(idx, name)
       idx += 1
     endwhile
   else
-    Debug.Trace("AutoWalk: RefreshUserMapMarkers(): no usedList for world=" + GetPlayerWorldSpace(), 1)
+    Debug.Trace("AutoWalk: RefreshUserMapMarkersForMCM(): no usedList for world=" + GetPlayerWorldSpace(), 1)
     ;Debug.Notification("AutoWalk: User map markers not supported for this worldspace."); no use because it shows up after MCM is closed
   endif
 
@@ -1074,7 +1158,7 @@ EndFunction
 
 ; Called when the MCM menu is opened.
 Function OnMCMOpen()
-  RefreshUserMapMarkers()
+  RefreshUserMapMarkersForMCM()
 EndFunction
 
 Function OnMCMClose()
@@ -1082,7 +1166,7 @@ Function OnMCMClose()
 EndFunction
 
 ; Updates the user map marker list in the MCM and database.
-Function UpdateUserMapMarkerList(int idx, string value)
+Function UpdateUserMapMarkerList(int idx, string markerName)
   FormList[] lists = GetUserMapMarkerLists(GetPlayerWorldSpace())
   FormList usedList = lists[1]
   if !usedList
@@ -1092,44 +1176,55 @@ Function UpdateUserMapMarkerList(int idx, string value)
 
   if usedList.GetSize() == 0 || idx > usedList.GetSize() - 1
     Debug.Trace("AutoWalk: UpdateUserMapMarkerList(): index out of range: idx=" + idx + ", list size=" + usedList.GetSize(), 1)
-    RefreshUserMapMarkers()
+    if markerName != ""
+      Debug.Trace("AutoWalk: UpdateUserMapMarkerList(): adding new user map marker with name " + markerName, 1)
+      AddUserMapMarker(markerName)
+    endif
+    RefreshUserMapMarkersForMCM()
     return
   endif
 
-  Form marker = usedList.GetAt(idx)
-  if value == ""
+  ObjectReference marker = usedList.GetAt(idx) as ObjectReference
+  if markerName == ""
     WorldSpace ws = Game.GetPlayer().GetWorldSpace()
-    GridCell[] cells = None
-    int cellIndex
-    if ws == WorldSpaceCommonwealth
-      cellIndex = GetContainingCellIndex(GridCommonwealth, PlayerRef.x, PlayerRef.y)
-      cells = GridCellsCommonwealth
-    elseif ws == WorldSpaceFarHarbor
-      cellIndex = GetContainingCellIndex(GridFarHarbor, PlayerRef.x, PlayerRef.y)
-      cells = GridCellsFarHarbor
-    elseif ws == WorldSpaceNukaWorld
-      cellIndex = GetContainingCellIndex(GridNukaWorld, PlayerRef.x, PlayerRef.y)
-      cells = GridCellsNukaWorld
-    endif
-    if cells[cellIndex].markers.HasForm(marker)
-      cells[cellIndex].markers.RemoveAddedForm(marker)
+    GridCell cell_ = GetContainingGridCell(marker.x, marker.y, ws)
+    if cell_ && cell_.markers.HasForm(marker)
+      cell_.markers.RemoveAddedForm(marker)
       Debug.Trace("AutoWalk: UpdateUserMapMarkerList(): user marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " removed from database", 1)
-      Debug.Notification("AutoWalk: User map marker \"" + SUP_F4SE.MapMarkerGetName(marker as ObjectReference) + "\" [" + GardenOfEden.IntToHex(marker.GetFormId()) + "] removed.")
+      Debug.Notification("AutoWalk: User map marker \"" + SUP_F4SE.MapMarkerGetName(marker) + "\" [" + GardenOfEden.IntToHex(marker.GetFormId()) + "] removed.")
     else
       Debug.Trace("AutoWalk: UpdateUserMapMarkerList(): ERROR: user marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " not found in database", 1)
     endif
     usedList.RemoveAddedForm(marker)
-    (marker as ObjectReference).Disable()
-    DeleteUserMapMarkerName(marker as ObjectReference)
-    RefreshUserMapMarkers()
+    marker.Disable()
+    RemoveUserMapMarker(marker)
+    RefreshUserMapMarkersForMCM()
   else
-    SetMcmUserMapMarkerSlot(idx, value)
-    SaveUserMapMarkerName(marker as ObjectReference, value) ; Save separately because SUP_F4SE.MapMarkerSetName is not reliable
-    SUP_F4SE.MapMarkerSetName(marker as ObjectReference, value)
-    Debug.Trace("AutoWalk: UpdateUserMapMarkerList(): user marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " name changed to " + SUP_F4SE.MapMarkerGetName(marker as ObjectReference), 1)
+    SetMcmUserMapMarkerSlot(idx, markerName)
+    SaveUserMapMarkerInfo(marker, markerName) ; Save separately because SUP_F4SE.MapMarkerSetName is not reliable
+    SUP_F4SE.MapMarkerSetName(marker, markerName)
+    Debug.Trace("AutoWalk: UpdateUserMapMarkerList(): user marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " name changed to " + SUP_F4SE.MapMarkerGetName(marker), 1)
   endif
 EndFunction
 
+function UserMarkerShowHide(bool show)
+  Debug.Trace("AutoWalk: UserMarkerShowHide: show=" + show, 1)
+  gDisplayUserMarkers = show
+  FormList[] lists = GetUserMapMarkerLists(GetPlayerWorldSpace())
+  FormList usedList = lists[1]
+  if usedList
+    int i = 0
+    while i < usedList.GetSize()
+      ObjectReference marker = usedList.GetAt(i) as ObjectReference
+      if show
+        marker.Enable()
+      else
+        marker.Disable()
+      endif
+      i += 1
+    endwhile
+  endif
+EndFunction
 ; ======================
 ; === UTIL FUNCTIONS ===
 ; ======================

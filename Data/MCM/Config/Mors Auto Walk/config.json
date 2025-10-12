@@ -127,19 +127,15 @@
     },
     {
       "type": "text",
-      "text": "Combat Settle Timers"
+      "text": "These settings handle \"lingering combat state\" — when the game still thinks you are in combat even though no enemies are nearby. Auto-Walk first waits for combat to clear naturally; if that times out, it can attempt a \"soft-clear\"."
     },
     {
       "type": "text",
-      "text": "These settings address the \"lingering combat state\"—when the game still considers you in combat even with no hostiles nearby. Auto-Walk first waits for a natural cooldown; if that fails, it may attempt a soft-clear.\n\n"
+      "text": "[!] Soft-clear note: A soft-clear tries to force the combat state to end. This can be useful but may, in rare cases, end a just-finished encounter prematurely. If you prefer a safer approach, increase the non-combat wait and/or the maximum wait before allowing a soft-clear."
     },
     {
       "type": "text",
-      "text": "[!] Soft-clear note: Soft-clearing combat may rarely suppress a legitimate, just-ended encounter. If you prefer a safer approach, increase the non-combat wait and/or the maximum wait before allowing a soft-clear.\n\n"
-    },
-    {
-      "type": "text",
-      "text": "Tip: If \"Max wait sec\" is lower than \"Non-combat wait sec\", the attempt will always time out."
+      "text": "Tip: Ensure \"Max wait sec\" is equal to or greater than \"Non-combat wait sec\". If Max wait is smaller, the attempt will always time out immediately."
     },
     {
       "type": "switcher",
@@ -212,7 +208,7 @@
       "id": "AWR_MaxSecond",
       "type": "slider",
       "text": "Max wait sec (after soft-clear)",
-      "help": "Maximum confirmation time after soft‑clear. You rarely need to change this.",
+      "help": "Maximum confirmation time after soft-clear. You rarely need to change this.",
       "valueOptions": {
         "sourceType": "GlobalValue",
         "sourceForm": "Mors Auto Walk Addon.esp|11F9",
@@ -228,21 +224,37 @@
     },
     {
       "type": "section",
-      "text": "Debug"
+      "text": "Debug User Marker"
     },
     {
-      "type": "button",
-      "text": "Add new User Map Marker to Marker DB",
-      "help": "Add a user marker. This can be used to patch up navmesh/marker holes on the Fallout world map and helps guessing ground Z.",
+      "type": "text",
+      "text": "Add, edit, or remove a User Marker at the player's current map position."
+    },
+    {
+      "type": "text",
+      "text": "Use cases:\n- Patch navmesh or marker gaps so the mod can better estimate ground Z."
+    },
+    {
+      "type": "text",
+      "text": "- Prevent Pip-Boy custom destination markers from landing on unreachable high ground (e.g., rooftops, treetops, behind barriers). Place the User Marker on nearby accessible ground."
+    },
+    {
+      "type": "switcher",
+      "text": "Show/Hide User Marker",
+      "help": "Show/Hide User Marker on world map.",
+      "valueOptions": {
+        "sourceType": "ModSettingBool"
+      },
       "action": {
         "type": "CallFunction",
         "form": "Mors Auto Walk Addon.esp|100D",
-        "function": "AddCurrentPositionToUserMarkerDB"
+        "function": "UserMarkerShowHide",
+        "params": ["{value}"]
       }
     },
     {
-      "text": "User Map Markers",
-      "help": "Shows current WorldSpace's User Map Markers",
+      "text": "User Markers",
+      "help": "Shows the current WorldSpace's User Map Markers. Add a marker by entering a new name in an empty entry. Delete the entry text to remove a marker.",
       "type": "text"
     },
     {

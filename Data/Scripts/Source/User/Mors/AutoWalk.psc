@@ -207,6 +207,12 @@ function OnDestinationSelect(int callback_type, var [] args)
 			if entry.dstMarker
 				DstMarker.ForceRefTo(entry.dstMarker)
 			else
+				Debug.Trace("AutoWalk: OnDestinationSelect: searching for marker fix for " + entry.marker.GetFormId() )
+				float [] fix = MarkerDBScript.GetMarkerFix(entry.marker)
+				if fix && fix.Length > 2
+      				entry.marker.SetPosition(fix[0], fix[1], fix[2])
+      				Debug.Trace("AutoWalk: OnDestinationSelect: marker fix found: (" + fix[0] +"," + fix[0] + "," + fix[0] + ")", 1)
+    			endif
 				DstMarker.ForceRefTo(entry.marker)
 			endIf
 			StartWalking()
@@ -241,7 +247,7 @@ event OnControlUp(string _ctl, float _time)
 				GoToState("STOPPING")
 				;StopWalking()
 			else
-				if bContinueWalkingToCustomMarker == MorsAW_MenuCustomDestination
+				if bContinueWalkingToCustomMarker
 					CurrentCustomDstMarker = GetCustomDstMarker()
 					Debug.Trace("AutoWalk: OnControlUp: marker=" + CurrentCustomDstMarker, 1)
 					if CurrentCustomDstMarker
@@ -440,7 +446,7 @@ event OnTimer(int _timer)
 		ShowMenu()
 	elseif _timer == TimerCheckArrival
 		float dist = SUP_F4SE.GetDistanceBetweenPoints(CurrentCustomDstMarker.X, PlayerRef.x, CurrentCustomDstMarker.Y, PlayerRef.y, 0, 0 )
-		Debug.Trace("AutoWalk: OnTimer: dist=" + dist +", bWalking=" + bWalking, 1)
+		Debug.Trace("AutoWalk: OnTimer: early stop timer: dist=" + dist +", bWalking=" + bWalking, 1)
 		if dist <= 300.0
 			CancelTimer(TimerCheckArrival)
 			MorsAW_Scene.Stop()
@@ -580,7 +586,7 @@ state STOPPED
 		else
 			Debug.Notification("You stopped walking")
 		endIf
-		Debug.trace("AutoWalk: OnBeginState(STOPPED): Player Position: " + "(" + PlayerRef.x + ", " + PlayerRef.y +", " + PlayerRef.z + ")", 1)
+		Debug.trace("AutoWalk: OnBeginState(STOPPED): Player Position: " + "(" + PlayerRef.x + ", " + PlayerRef.y +", " + PlayerRef.z + "), world space: " + PlayerRef.GetCurrentLocation(), 1)
 	endEvent
 endState
 

@@ -34,9 +34,9 @@ Event OnEffectStart(Actor akTarget, Actor akCaster)
         ;     return
         ; endif
         AWR_ThreatDetector.LastPingRTS = lastPingRTS
-        _Log("ThreatSense: actor " + akTarget+" Updated lastPingRTS: lastPingRTS=" + lastPingRTS)
+        ;_Log("ThreatSense: actor " + akTarget+" Updated lastPingRTS: lastPingRTS=" + lastPingRTS + ", LOS=" + akTarget.HasDetectionLOS(PlayerRef))
     else
-        _Log("ThreatSense: actor " + akTarget+" avoiding notification: threat is already notified at " + lastPingRTS)
+        ;_Log("ThreatSense: actor " + akTarget+" avoiding notification: threat is already notified at " + lastPingRTS)
     endif
 
     ; _Log("ThreatSense: notifying core about " + akTarget)
