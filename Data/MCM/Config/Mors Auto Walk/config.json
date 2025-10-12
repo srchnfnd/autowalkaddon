@@ -138,12 +138,33 @@
       "text": "Tip: Ensure \"Max wait sec\" is equal to or greater than \"Non-combat wait sec\". If Max wait is smaller, the attempt will always time out immediately."
     },
     {
+      "type": "spacer",
+      "numLines": 1
+    },
+    {
       "type": "switcher",
       "text": "Enable Combat Settle Timers",
       "help": "Enable/Disable this feature",
       "valueOptions": {
         "sourceType": "GlobalValue",
         "sourceForm": "Mors Auto Walk Addon.esp|11FA"
+      }
+    },
+    {
+      "type": "spacer",
+      "numLines": 1
+    },
+    {
+      "type": "slider",
+      "text": "Threat Sense Detection Range",
+      "help": "Sets the maximum distance (in game units) to detect hostile NPCs. Default 1500.0. (approx. 70 units per meter)",
+      "valueOptions": {
+        "sourceType": "GlobalValue",
+        "sourceForm": "Mors Auto Walk Addon.esp|1285",
+        "min": 500.0,
+        "max": 6000.0,
+        "step": 50.0,
+        "default": 2500.0
       }
     },
     {

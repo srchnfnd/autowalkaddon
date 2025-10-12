@@ -3,7 +3,7 @@ Scriptname Mors:AWR_ThreatSenseEffect extends ActiveMagicEffect
 ; Filled in the quest that owns your main logic
 Mors:AWR_ThreatDetector  Property AWR_ThreatDetector Auto
 Actor Property PlayerRef Auto
-Float Property CooldownSeconds = 0.5 Auto ; per-instance throttle (optional)
+GlobalVariable property AWR_ThreatSenseDetectionRangeGV Auto
 
 Function _Log(string msg)
   Debug.Trace("AutoWalkThreatSense: " + msg, 1)
@@ -18,32 +18,27 @@ Event OnEffectStart(Actor akTarget, Actor akCaster)
         return
     endif
 
-    ; if AWR_ThreatDetector == None
-    ;     _Log("ThreatSense: Core quest property is NONE; cannot notify.")
-    ;     return
-    ; endif
+    float range = AWR_ThreatSenseDetectionRangeGV.GetValue()
+    float dist = akCaster.GetDistance(akTarget)
+    _Log("Target=" + akTarget + " distance=" + dist + " range config=" + range)
 
-    ; Flooding control
-    ; Random delay to reduce burst, data race
-    Utility.Wait(Utility.RandomFloat(0.0, 0.5))
-    float lastPingRTS = AWR_ThreatDetector.LastPingRTS
-    if lastPingRTS == 0.0
-        lastPingRTS = Utility.GetCurrentRealTime()
-        ; if (now - lastPingRTS) < CooldownSeconds
-        ;     _Log("ThreatSense: actor " + akTarget+" avoiding overly frequent update: time diff=" + (now - lastPingRTS))
-        ;     return
-        ; endif
-        AWR_ThreatDetector.LastPingRTS = lastPingRTS
-        ;_Log("ThreatSense: actor " + akTarget+" Updated lastPingRTS: lastPingRTS=" + lastPingRTS + ", LOS=" + akTarget.HasDetectionLOS(PlayerRef))
-    else
-        ;_Log("ThreatSense: actor " + akTarget+" avoiding notification: threat is already notified at " + lastPingRTS)
+    ; Ignore targets outside user-defined detection range
+    if dist > range
+        _Log("Target outside range; skipping threat update.")
+        return
     endif
 
-    ; _Log("ThreatSense: notifying core about " + akTarget)
-    ; Fire-and-forget call into the core quest
-    ; Var[] args = new Var[1]
-    ; args[0] = akTarget
-    ; AWR_ThreatDetector.CallFunctionNoWait("InterruptCombatClearWait", args)
-    ;AWR_CoreQuest.InterruptCombatClearWait(akTarget)
+    ; optional randomized stagger to prevent synchronous spikes
+    Utility.Wait(Utility.RandomFloat(0.0, 0.5))
 
+    float lastPingRTS = AWR_ThreatDetector.LastPingRTS
+
+    ; Only set LastPingRTS if currently zero (first detection after reset)
+    if lastPingRTS == 0.0
+    lastPingRTS = Utility.GetCurrentRealTime()
+    AWR_ThreatDetector.LastPingRTS = lastPingRTS
+    _Log("Threat detected; LastPingRTS set to " + lastPingRTS)
+    else
+    _Log("Threat already active; LastPingRTS unchanged.")
+    endif
 EndEvent 

@@ -199,8 +199,8 @@ Function _EnableThreatSense(bool on)
         _ignoreThreatsUntil = Utility.GetCurrentRealTime() + 3.5
         if AWR_ThreatSenseAbility && PlayerRef.HasSpell(AWR_ThreatSenseAbility)
             PlayerRef.RemoveSpell(AWR_ThreatSenseAbility)
-            CancelTimer(TimerIDSpellCast)
         endif
+        CancelTimer(TimerIDSpellCast)
     endif
     
 EndFunction
