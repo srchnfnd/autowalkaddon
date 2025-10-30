@@ -730,10 +730,12 @@ EndFunction
 bool Function SendUpdateCustomDestination(bool fallbackDraft = false)
   if currentDestinationMarkerInfo
     if currentDestinationMarkerInfo.playerMarkerCell == PlayerRef.GetParentCell()
-      Debug.Trace("AutoWalk: Determining ground height for custom destination marker...", 1)
-      float groundZ = GetGroundZ(currentDestinationMarkerInfo.playerMarkerX, currentDestinationMarkerInfo.playerMarkerY, currentDestinationMarkerInfo.playerMarkerZ)
-      currentDestinationMarkerInfo.playerMarkerZ = groundZ
-      currentDestinationMarkerInfo.playerMarkerZProbed = true
+      if currentDestinationMarkerInfo.playerMarkerZProbed == false
+        Debug.Trace("AutoWalk: Determining ground height for custom destination marker...", 1)
+        float groundZ = GetGroundZ(currentDestinationMarkerInfo.playerMarkerX, currentDestinationMarkerInfo.playerMarkerY, currentDestinationMarkerInfo.playerMarkerZ)
+        currentDestinationMarkerInfo.playerMarkerZ = groundZ
+        currentDestinationMarkerInfo.playerMarkerZProbed = true
+      endif
       Var[] args = new Var[1]
       args[0] = currentDestinationMarkerInfo
       SendCustomEvent("UpdateCustomDestination", args)
