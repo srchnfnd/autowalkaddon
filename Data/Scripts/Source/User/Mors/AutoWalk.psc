@@ -124,6 +124,8 @@ Mors:AWR_DstMenu property AWR_DstMenuScript const auto
 
 function ShowMenu()
 
+	; If we are waiting for combat clear, cancel it
+	ThreatDetectorScript.CancelCombatClearWait()
 
 	; Determine where we are (Commonwealth/Nuka World/Far Harbor) and use appropriate function to display the menu
 	location _location = PlayerRef.GetCurrentLocation()

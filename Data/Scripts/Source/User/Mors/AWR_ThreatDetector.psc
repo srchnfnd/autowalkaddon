@@ -85,6 +85,7 @@ EndFunction
 Event OnHit(ObjectReference akTarget, ObjectReference akAggressor, Form akSource, Projectile akProjectile, bool abPowerAttack, bool abSneakAttack, bool abBashAttack, bool abHitBlocked, string apMaterial)
     _lastHitRTS = Utility.GetCurrentRealTime()
     _Log("AutoWalk: OnHit: akTarget=" + akTarget + ", akAggressor=" + akAggressor)
+      RegisterForHitEvent(PlayerRef)
 EndEvent
 
 Event OnTimer(int timerID)
