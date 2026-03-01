@@ -263,6 +263,15 @@ event OnControlUp(string _ctl, float _time)
 				;StopWalking()
 			else
 				if bContinueWalkingToCustomMarker
+					; If a message appears inside GetCustomDstMarker() indicating that the database needs to be rebuilt
+					; in this situation (when the user briefly presses to attempt to continue walking to the existing destination),
+					; it may confuse the user. Instead, silently revert to normal walking mode.
+					if MarkerDBScript.GetDBState() != MarkerDBScript.AWR_DB_STATE_READY()
+						Debug.Trace("AutoWalk: OnControlUp: DB not ready. falling back to normal walking.", 1)
+						bContinueWalkingToCustomMarker = false
+						StartWalking()
+						return
+					endif
 					CurrentCustomDstMarker = GetCustomDstMarker()
 					Debug.Trace("AutoWalk: OnControlUp: marker=" + CurrentCustomDstMarker, 1)
 					if CurrentCustomDstMarker
@@ -611,15 +620,10 @@ endState
 ;-- Custom Marker ----------------------------------
 
 ObjectReference Function GetCustomDstMarker()
-	; Define local aliases for DBSTATE constants (must match values in AutoWalkMarkerDB script)
-	int DBSTATE_NOTREADY = 0
-	int DBSTATE_BUILDING = 1
-	;int DBSTATE_READY = 2
-
-	if MarkerDBScript.GetDBState() == DBSTATE_NOTREADY
+	if MarkerDBScript.GetDBState() == MarkerDBScript.AWR_DB_STATE_NOT_READY()
 		Debug.MessageBox("AutoWalk\n\nWalking to Custom Destination requires Map Marker Database.\nYou can start building it in MCM.")
 		return None
-	elseif MarkerDBScript.GetDBState() == DBSTATE_BUILDING
+	elseif MarkerDBScript.GetDBState() == MarkerDBScript.AWR_DB_STATE_BUILDING()
 		Debug.MessageBox("AutoWalk\n\nMap Marker Database is currently building.\nPlease wait until it is finished.")
 		return None
 	endif

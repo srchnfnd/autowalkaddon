@@ -135,10 +135,16 @@ CustomEvent UpdateCustomDestination
 ; =======================
 ; === STATE VARIABLES ===
 ; =======================
+int Function AWR_DB_STATE_NOT_READY()
+    Return 0 
+EndFunction
+int Function AWR_DB_STATE_BUILDING()
+    Return 1
+EndFunction
+int Function AWR_DB_STATE_READY()
+    Return 2
+EndFunction
 
-int STATE_NOT_READY = 0
-int STATE_BUILDING = 1
-int STATE_READY = 2
 int databaseState = 0
 
 ObjectReference[] allStaticRefs
@@ -171,7 +177,7 @@ Event Actor.OnPlayerLoadGame(Actor sender)
   SUP_F4SE.RegisterForSUPEvent("OnCellChange", self as Form, "Mors:AutoWalkMarkerDB", "OnCellChange", true, false)
   isCalibrating = false
 
-  if databaseState == STATE_BUILDING
+  if databaseState == AWR_DB_STATE_BUILDING()
     lastNotificationTime = 0.0
     if totalStaticObjects == 0
       Debug.Trace("AutoWalk: OnPlayerLoadGame: Database building started but no static objects to process. Completing...", 1)
@@ -263,7 +269,7 @@ EndFunction
 
 ; Starts the process of building the map marker database.
 Function BuildMapMarkerDatabase()
-  if databaseState == STATE_BUILDING
+  if databaseState == AWR_DB_STATE_BUILDING()
     Debug.Trace("AutoWalk: BuildMapMarkerDatabase() called while already building. Aborting.", 1)
     return
   endif
@@ -273,7 +279,7 @@ Function BuildMapMarkerDatabase()
     return
   endif
 
-  databaseState = STATE_BUILDING
+  databaseState = AWR_DB_STATE_BUILDING()
   currentDestinationMarkerInfo = None
 
   UsedUserMarkerListCommonwealth.Revert()
@@ -502,12 +508,12 @@ Function CompleteBuilding()
   endwhile
   DebugList.Revert()
 
-  databaseState = STATE_READY
+  databaseState = AWR_DB_STATE_READY()
 EndFunction
 
 ; Shows progress notifications during database building.
 Function ShowDBBuildingProgress()
-  if databaseState != STATE_READY
+  if databaseState != AWR_DB_STATE_READY()
     if staticRefsIndex < totalStaticObjects
       Debug.Trace("AutoWalk: Progress=(" + foundMapMarkerObjects + "/" + staticRefsIndex + "/" + totalStaticObjects + ")", 1)
       Debug.Notification("AutoWalk: Building Marker DB " + buildProgress as Int + "%...")
@@ -524,7 +530,7 @@ EndFunction
 
 ; Returns the custom destination marker ObjectReference, calibrating if needed.
 ObjectReference Function GetCustomDestinationMarkerAsync()
-  if databaseState != STATE_READY
+  if databaseState != AWR_DB_STATE_READY()
     Debug.Trace("AutoWalk: ERROR: Cannot start calibration; database is not ready.", 1)
     return None
   endif

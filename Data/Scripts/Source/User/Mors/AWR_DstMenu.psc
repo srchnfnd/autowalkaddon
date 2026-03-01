@@ -105,6 +105,7 @@ int gLastFilteredCount_Other = -1
 ; ============================
 Event OnQuestInit()
     Debug.TraceSelf(self, "OnQuestInit", "")
+    RegisterForRemoteEvent(PlayerRef, "OnPlayerLoadGame")
 	OnGameReload()
 EndEvent
 
