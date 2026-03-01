@@ -65,11 +65,10 @@ Event OnQuestInit()
   RegisterForExternalEvent("OnMCMOpen", "OnMCMOpen")
   RegisterForExternalEvent("OnMCMClose", "OnMCMClose")
   RegisterForHitEvent(PlayerRef)
-  Debug.Trace("OnQuestInit() called.", 1)
+  Debug.Trace("AutoWalkThreatDet: OnQuestInit() called.", 1)
 EndEvent
 
 Event OnInit()
-  SUP_F4SE.RegisterForSUPEvent("OnPlayerMapMarkerStateChange", self as Form, "Mors:AutoWalkMarkerDB", "OnPlayerMapMarkerStateChange", true, false)
   ApplySettingsFromGlobals()
   _Log("OnInit() called.")
 EndEvent
@@ -84,7 +83,7 @@ EndFunction
 
 Event OnHit(ObjectReference akTarget, ObjectReference akAggressor, Form akSource, Projectile akProjectile, bool abPowerAttack, bool abSneakAttack, bool abBashAttack, bool abHitBlocked, string apMaterial)
     _lastHitRTS = Utility.GetCurrentRealTime()
-    _Log("AutoWalk: OnHit: akTarget=" + akTarget + ", akAggressor=" + akAggressor)
+    _Log("OnHit: akTarget=" + akTarget + ", akAggressor=" + akAggressor)
       RegisterForHitEvent(PlayerRef)
 EndEvent
 
@@ -110,9 +109,9 @@ Event OnTimer(int timerID)
   ; Observe combat status; treat "in combat" as breaking the stability window
   if Game.GetPlayer().IsInCombat()
       _lastCombatRTS = now
-      _Log(" Tick: player in combat")
+      _Log("OnTimer: player in combat")
   else
-      _Log(" Tick: player NOT in combat (stable for " + (now - _lastCombatRTS) + "s)")
+      _Log("OnTimer: player NOT in combat (stable for " + (now - _lastCombatRTS) + "s)")
   endif
   
   if LastPingRTS > _lastCombatRTS
@@ -121,7 +120,7 @@ Event OnTimer(int timerID)
 
   bool wasHitRecent = (Utility.GetCurrentRealTime() - _lastHitRTS) <= 5; 5: AWR_HitRecentWindow
   bool threatPing   = (Utility.GetCurrentRealTime() - LastPingRTS) <= 5; AWR_ThreatPingWindow
-  _Log(" Tick: wasHitRecent=" + wasHitRecent + ", threatPing=" + threatPing)
+  _Log("OnTimer: wasHitRecent=" + wasHitRecent + ", threatPing=" + threatPing)
   ; stop immediately if interrupted, hit recently, or threat ping active
   if (wasHitRecent || threatPing)
     FinishWait(AWR_WAIT_INTERRUPTED(), timerID)

@@ -113,7 +113,6 @@ int TimerCheckArrival = 20
 bool bWalking = False ; MorsAW_Scene.IsPlaying() is not reliable
 ObjectReference CurrentCustomDstMarker = None
 bool bPlayerInCombat = false
-bool bRegisteredCombatStateEvent = false
 float arrivalCheckInterval = 3.0
 
 bool bContinueWalkingToCustomMarker = false
@@ -122,7 +121,20 @@ Mors:AutoWalkMarkerDB Property MarkerDBScript Auto const
 Mors:AWR_ThreatDetector Property ThreatDetectorScript Auto const 
 Mors:AWR_DstMenu property AWR_DstMenuScript const auto
 
-function ShowMenu()
+Event OnQuestInit()
+  RegisterForRemoteEvent(PlayerRef, "OnPlayerLoadGame")
+  RegisterForRemoteEvent(PlayerRef, "OnCombatStateChanged")
+EndEvent
+
+Event OnInit()
+  SUP_F4SE.RegisterForSUPEvent("OnPlayerMapMarkerStateChange", self as Form, "Mors:AutoWalk", "OnPlayerMapMarkerStateChange", true, false)
+EndEvent
+
+Event Actor.OnPlayerLoadGame(Actor sender)
+  SUP_F4SE.RegisterForSUPEvent("OnPlayerMapMarkerStateChange", self as Form, "Mors:AutoWalk", "OnPlayerMapMarkerStateChange", true, false)
+EndEvent
+
+function ShowMenu() 
 
 	; If we are waiting for combat clear, cancel it
 	ThreatDetectorScript.CancelCombatClearWait()
@@ -138,8 +150,6 @@ function ShowMenu()
 	else
 		iWorldSpace = AWR_DstMenuScript.AWR_WORLDSPACE_COMMONWEALTH()
 	endIf
-
-	AWR_DstMenuScript.OnGameReload() ; temporary measure until mod clean install and AWR_DstMenu.OnQuestInit() works
 
 	ScriptObject receiver = self as ScriptObject
 	Var[] args = new Var[4]
@@ -193,7 +203,7 @@ function OnDestinationSelect(int callback_type, var [] args)
 	if callback_type == AWR_DstMenuScript.AWR_CALLBACK_TYPE_DSTENTRY()
 		AWR_DstMenu:DstEntry entry = args[0] as AWR_DstMenu:DstEntry
 		if entry == None
-			; custom destination
+			; user clicked custom destination
 			CurrentCustomDstMarker = GetCustomDstMarker()
 			Debug.Trace("AutoWalk: OnDestinationSelect: custom marker=" + CurrentCustomDstMarker, 1)
 			if CurrentCustomDstMarker
@@ -232,15 +242,18 @@ function StartWalkingToCustomMarker(ObjectReference staticMarker)
 	StartWalking() 
 EndFunction
 
+Function OnPlayerMapMarkerStateChange(bool wasAdded, WorldSpace currentWorldSpace, float posX, float posY, float posZ)
+	Debug.Trace("AutoWalk: OnPlayerMapMarkerStateChange()")
+	; last destination was a menu-selected. switch to custom marker walking.
+	if bContinueWalkingToCustomMarker == false
+		bContinueWalkingToCustomMarker = true
+		Debug.Trace("AutoWalk: OnPlayerMapMarkerStateChange(): selection type changed to custom marker")
+	endif
+EndFunction
+
 event OnControlUp(string _ctl, float _time)
 	Debug.Trace("AutoWalk: OnControlUp(): key=" + _ctl + ", time=" + _time, 1)
 	if _ctl == "MorsAutoWalkHotkey1"
-		; temporary measure to register for combat state change event until clean install of mod and OnQuestInit() works
-		if bRegisteredCombatStateEvent == False
-			Self.RegisterForRemoteEvent(PlayerRef, "OnCombatStateChanged")
-			Debug.Trace("AutoWalk: OnControlUp: registering combat state event", 1)
-			bRegisteredCombatStateEvent = True
-		endIf
 		if _time < HotkeyHoldTime
 			CancelTimer(TimerMenuKeyDown)
 			if bWalking || MorsAW_Scene.IsPlaying()
@@ -255,6 +268,9 @@ event OnControlUp(string _ctl, float _time)
 					if CurrentCustomDstMarker
 						dstName = "Custom Destination"
 						StartWalkingToCustomMarker(CurrentCustomDstMarker)
+					else
+						bContinueWalkingToCustomMarker = false
+						StartWalking()
 					endif
 				else
 					StartWalking()

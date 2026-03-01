@@ -104,15 +104,18 @@ int gLastFilteredCount_Other = -1
 ; Lifecycle
 ; ============================
 Event OnQuestInit()
+    Debug.TraceSelf(self, "OnQuestInit", "")
 	OnGameReload()
 EndEvent
 
 Event Actor.OnPlayerLoadGame(Actor akSender)
+    Debug.TraceSelf(self, "OnPlayerLoadGame", "") 
     OnGameReload()
 EndEvent
 
 Function OnGameReload()
     ; Reset caches on reload
+    Debug.traceSelf(self, "OnGameReload", "Resetting destination menu caches")
     gCachedEntries_Settlements = None
     gCachedEntries_Other = None
     gLastFilteredCount_Settlements = -1
@@ -159,10 +162,7 @@ EndFunction
 
 bool Function Close()
     ; Reset caches on close
-    gCachedEntries_Settlements = None
-    gCachedEntries_Other = None
-    gLastFilteredCount_Settlements = -1
-    gLastFilteredCount_Other = -1
+    Debug.TraceSelf(self, "Close", "Closing menu")
 	If (!IsOpen)
 		Debug.traceSelf(self, "Close", "This menu is already closed!")
 		return true
@@ -380,7 +380,7 @@ Function OpenDestinations(bool settlements)
         endif
     else
         if filteredCount != gLastFilteredCount_Other
-            Debug.traceSelf(self, "OpenDestinations", "Rebuilding other entries array")
+            Debug.traceSelf(self, "OpenDestinations", "Rebuilding other entries array: gLastFilteredCount_Other: " + gLastFilteredCount_Other + " filteredCount: " + filteredCount)
             gLastFilteredCount_Other = filteredCount
             gCachedEntries_Other = new DstEntry[filteredCount]
             i = 0
