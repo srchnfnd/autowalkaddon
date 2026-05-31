@@ -166,6 +166,7 @@ CustomDestinationMarkerInfo currentDestinationMarkerInfo = None
 
 Event OnQuestInit()
   Debug.Trace("AutoWalk: OnQuestInit", 1)
+  Debug.Notification("AutoWalk: Installed.")
   RegisterForRemoteEvent(PlayerRef, "OnPlayerLoadGame")
   RegisterForExternalEvent("OnMCMOpen", "OnMCMOpen")
   RegisterForExternalEvent("OnMCMClose", "OnMCMClose")
@@ -269,6 +270,10 @@ EndFunction
 
 ; Starts the process of building the map marker database.
 Function BuildMapMarkerDatabase()
+
+  Debug.MessageBox("Please exit MCM to begin building the map marker database.")
+	Utility.Wait(0.5)
+
   if databaseState == AWR_DB_STATE_BUILDING()
     Debug.Trace("AutoWalk: BuildMapMarkerDatabase() called while already building. Aborting.", 1)
     return
@@ -761,7 +766,7 @@ EndFunction
 
 ; Loads marker fix data from JSON, if available.
 float[] Function GetMarkerFix(ObjectReference marker)
-  string formIdStr = MyFormIdHexStr(marker.GetFormId())
+  string formIdStr = MarkerFormIdHexStr(marker.GetFormId())
   ;string pluginFile = GardenOfEden2.LookupPluginNameByForm(marker)
   string pluginFile = GardenOfEden2.GetLastOverridePluginFile(marker)
   string fileName = "Data/Mors Auto Walk/MarkerFix_" + pluginFile + ".json"
@@ -995,7 +1000,7 @@ EndFunction
 
 ; Saves the name for a user map marker to a JSON file.
 Function SaveUserMapMarkerInfo(ObjectReference marker, String name)
-  string formIdStr = MyFormIdHexStr(marker.GetFormId())
+  string formIdStr = MarkerFormIdHexStr(marker.GetFormId())
   string worldSpaceStr = WorldSpaceToString(marker.GetWorldSpace())
   string fileName = "Data/Mors Auto Walk/UserMarker_" + worldSpaceStr + ".json"
   int rc = SUP_F4SE.JSONSetValueString(fileName, formIdStr + "_name", name, 0)
@@ -1007,9 +1012,10 @@ EndFunction
 
 ; Loads the name for a user map marker from a JSON file.
 UserMapMarker Function LoadUserMapMarkerInfo(ObjectReference marker)
-  string formIdStr = MyFormIdHexStr(marker.GetFormId())
+  string formIdStr = MarkerFormIdHexStr(marker.GetFormId())
   string worldSpaceStr = WorldSpaceToString(marker.GetWorldSpace())
   string fileName = "Data/Mors Auto Walk/UserMarker_" + worldSpaceStr + ".json"
+  Debug.Trace("AutoWalk: LoadUserMapMarkerInfo: Loading user map marker info for [" + formIdStr + "](" + formIdStr + ") from file: " + fileName, 1)
   string keyStr = formIdStr + "_name"
   SUP_F4SE:JSONValue jsval = SUP_F4SE.JSONGetValue(fileName, keyStr, 0)
   if !jsval || jsval.JSONsValue == ""
@@ -1062,7 +1068,7 @@ EndFunction
 
 ; Deletes the name for a user map marker from the JSON file.
 Function RemoveUserMapMarker(ObjectReference marker)
-  string formIdStr = MyFormIdHexStr(marker.GetFormId())
+  string formIdStr = MarkerFormIdHexStr(marker.GetFormId())
   string worldSpaceStr = WorldSpaceToString(marker.GetWorldSpace())
   string fileName = "Data/Mors Auto Walk/UserMarker_" + worldSpaceStr + ".json"
   string keyStr = formIdStr + "_name"
@@ -1070,6 +1076,7 @@ Function RemoveUserMapMarker(ObjectReference marker)
   SUP_F4SE.JSONSetValueFloat(fileName, formIdStr + "_x", 0.0, 0)
   SUP_F4SE.JSONSetValueFloat(fileName, formIdStr + "_y", 0.0, 0)
   SUP_F4SE.JSONSetValueFloat(fileName, formIdStr + "_z", 0.0, 0)
+  Debug.Trace("AutoWalk: Removed user map marker info for [" + formIdStr + "] from JSON.", 1)
   ; Note: SUP_F4SE.JSONEraseKey(fileName, keyStr, 0) causes crash-to-desktop (CtoD)
 EndFunction
 
@@ -1097,9 +1104,30 @@ Function RefreshUserMapMarkerUsedList()
   FormList[] lists = GetUserMapMarkerLists(GetPlayerWorldSpace())
   FormList spareList = lists[0]
   FormList usedList = lists[1]
+  Debug.Trace("AutoWalk: RefreshUserMapMarkerUsedList(): spareList size=" + spareList.GetSize() + ", spareList=" + spareList, 1)
+  Debug.Trace("AutoWalk: RefreshUserMapMarkerUsedList(): usedList size=" + usedList.GetSize() + ", usedList=" + usedList, 1)
   ; Clear the used list and rebuild it from the database
-  usedList.revert()
   int i = 0
+  while i < usedList.GetSize()
+    Form f = usedList.GetAt(i)
+    if f
+      ObjectReference marker = f as ObjectReference
+      if marker
+          ; remove from cell database if present
+        GridCell cell_ = GetContainingGridCell(marker.x, marker.y, GetPlayerWorldSpace())
+        if cell_ && cell_.markers.HasForm(marker)
+          cell_.markers.RemoveAddedForm(marker)
+          Debug.Trace("AutoWalk: RefreshUserMapMarkerUsedList(): removed marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " from grid database", 1)
+        endif
+        marker.Disable()
+      endif
+    endif
+    i += 1
+  endwhile
+
+  usedList.revert()
+
+  i = 0
   while i < spareList.GetSize()
     ObjectReference marker = spareList.GetAt(i) as ObjectReference
     UserMapMarker umk = LoadUserMapMarkerInfo(marker)
@@ -1111,7 +1139,7 @@ Function RefreshUserMapMarkerUsedList()
       GridCell cell_ = GetContainingGridCell(marker.x, marker.y, GetPlayerWorldSpace())
       if cell_ && !cell_.markers.HasForm(marker)
         cell_.markers.AddForm(marker)
-        Debug.Trace("AutoWalk: RefreshUserMapMarkerUsedList(): added marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " to database", 1)
+        Debug.Trace("AutoWalk: RefreshUserMapMarkerUsedList(): added marker " + GardenOfEden.IntToHex(marker.GetFormId()) + " to grid database", 1)
       endif
       if gDisplayUserMarkers
         marker.Enable()
@@ -1172,10 +1200,11 @@ Function OnMCMOpen()
 EndFunction
 
 Function OnMCMClose()
-
+  ; I don't know why the user map marker name does not update on Pip-boy map after editing the marker slot in MCM, but it works after user load same save 2 or more times after game start.
+  ; But calling RefreshUserMapMarkerUsedList() here does not work.
 EndFunction
 
-; Updates the user map marker list in the MCM and database.
+; Updates the user map marker when user edits a marker slot in the MCM. If markerName is empty, the marker will be removed; otherwise, it will be added/updated.
 Function UpdateUserMapMarkerList(int idx, string markerName)
   FormList[] lists = GetUserMapMarkerLists(GetPlayerWorldSpace())
   FormList usedList = lists[1]
@@ -1239,15 +1268,31 @@ EndFunction
 ; === UTIL FUNCTIONS ===
 ; ======================
 
+; float function GetFreeFallTimeMeters(float heightUnits)
+;     float heightMeters = heightUnits * 0.01905
+;     float gravity = 9.81
+;     return Math.Sqrt(2.0 * heightMeters / gravity)
+; endFunction
+
+float function GetFreeFallTime(float heightUnits)
+    float gravityUnits = 515.0
+    return Math.Sqrt(2.0 * heightUnits / gravityUnits)
+endFunction
+
 ; Returns the ground Z coordinate at the specified (x, y, z) position by placing a probe object and reading its final Z after settling.
 Float Function GetGroundZ(float x, float y, float z)
   ; The ground probe must have a mesh, weight, and dimensions for the drop effect and must be in the same cell as the player.
   Debug.Trace("AutoWalk: GetGroundZ: ground probe = " + GroundProbeForm, 1)
   ObjectReference probeObject = PlayerRef.PlaceAtMe(GroundProbeForm)
-  probeObject.SetPosition(x, y, z + 500)
-  Utility.Wait(4)
-  Debug.Trace("AutoWalk: GetGroundZ: Probe Object Position = (" + probeObject.x + ", " + probeObject.y + ", " + probeObject.z + ")", 1)
-  Debug.Trace("AutoWalk: GetGroundZ: Original Position = (" + x + ", " + y + ", " + z + ")", 1)
+  probeObject.SetPosition(x, y, z + 500); 500 units = 9.525m above the target position to ensure it falls to the ground
+  float fallTime = GetFreeFallTime(500)
+  Utility.Wait(fallTime + 0.5) ; wait for the probe to fall and settle; add a small buffer to ensure it's on the ground
+  ; String msg1 = "AutoWalk: GetGroundZ: Probe Object Position = (" + probeObject.x + ", " + probeObject.y + ", " + probeObject.z + ")"
+  ; String msg2 = "AutoWalk: GetGroundZ: Original Position = (" + x + ", " + y + ", " + z + ")"
+  ; Debug.Trace(msg1, 1)
+  ; Debug.Trace(msg2, 1)
+  ; Debug.Trace("AutoWalk: free fall height:" + 500 * 0.01905 + "m, time: " + fallTime + " seconds.", 1)
+  Debug.Notification("AutoWalk: Ground height determined: Z = " + probeObject.z)
   probeObject.Delete()
   return probeObject.z
 EndFunction
@@ -1260,12 +1305,16 @@ Function SetPlayerMapMarker(WorldSpace targetWorldSpace, float posX, float posY,
 EndFunction
 
 ; Returns the last 6 hex digits of a form ID as a string.
-String Function MyFormIdHexStr(int formID)
+String Function MarkerFormIdHexStr(int formID, bool isEslPlugin = false)
   String formIDString = GardenOfEden.IntToHex(formID)
   int len = StringUtil.GetLength(formIDString)
-  int start = len - 6
+  int extractDigits = 6
+  if isEslPlugin
+    extractDigits = 3 ; ESL plugin form IDs have only 3 hex digits
+  endif
+  int start = len - extractDigits
   if start >= 0
-    return StringUtil.Substring(formIDString, start, 6)
+    return StringUtil.Substring(formIDString, start, extractDigits)
   else
     return formIDString
   endif
@@ -1307,5 +1356,29 @@ String Function WorldSpaceToString(WorldSpace ws)
     return "NukaWorld"
   else
     return ws as String
+  endif
+EndFunction
+
+; =====================================
+; ========= MOD MANAGEMENT ============
+; =====================================
+
+Quest property AutoWalkQuest auto
+Quest property AWR_DstMenuQuest auto
+Quest property AWR_ThreatDetectorQuest auto
+
+Function PrepareUninstall()
+; Stop any timers, events, or other ongoing processes here to ensure a clean uninstall.
+  if AutoWalkQuest.IsRunning()
+    Debug.Trace("AutoWalk: Stopping AutoWalkQuest...", 1)
+  AutoWalkQuest.Stop()
+  endif
+  if AWR_DstMenuQuest.IsRunning()
+    Debug.Trace("AutoWalk: Stopping AWR_DstMenuQuest...", 1)
+    AWR_DstMenuQuest.Stop()
+  endif
+  if AWR_ThreatDetectorQuest.IsRunning()
+    Debug.Trace("AutoWalk: Stopping AWR_ThreatDetectorQuest...", 1)
+    AWR_ThreatDetectorQuest.Stop()
   endif
 EndFunction
