@@ -95,6 +95,9 @@ int property WalkSpeed  = 0 auto conditional hidden ; 0: slow,   1: fast,   2: j
 int property DrawWeapon = 0 auto conditional hidden ; 0: holstered,   1: unholstered
 int property Sneak      = 0 auto conditional hidden ; 0: normal,   1: sneaking
 
+ActorValue property SpeedMult auto const
+int OriginalSpeed = 0
+
 struct locData
 	objectReference marker
 	form miscItem
@@ -348,10 +351,93 @@ event OnControlDown(string _ctl)
 	endIf
 endEvent
 
+; function RotatePlayerToDestination()
+; 	; Rotate player to face the destination marker to reduce the chance of 'crazy dancing'.
+; 	ObjectReference obj = DstMarker.GetReference()
+; 	Game.SetPlayerAIDriven(false)
+; 	; 1. 목표 각도 계산
+; 	float fTargetAngleZ = PlayerRef.GetAngleZ() + PlayerRef.GetHeadingAngle(obj)
+
+; 	; 각도 정규화 (-180 ~ 180 사이로 보정하여 가장 짧은 회전 경로를 유도)
+; 	If fTargetAngleZ > 180.0
+; 		fTargetAngleZ -= 360.0
+; 	ElseIf fTargetAngleZ < -180.0
+; 		fTargetAngleZ += 360.0
+; 	EndIf
+
+; 	; 2. 자연스러운 회전 (TranslateTo)
+; 	PlayerRef.TranslateTo( \
+; 		PlayerRef.GetPositionX(), PlayerRef.GetPositionY(), PlayerRef.GetPositionZ(), \
+; 		PlayerRef.GetAngleX(), PlayerRef.GetAngleY(), fTargetAngleZ, \
+; 		60, 0.0 \
+; 	)
+; 	; 3. 회전이 완료될 때까지 대기
+; 	float fDiff = Math.Abs(PlayerRef.GetAngleZ() - fTargetAngleZ)
+; 	While fDiff > 5.0 ; 현재 각도와 목표 각도의 오차가 5도 이내가 될 때까지 대기
+; 		Debug.Trace("AutoWalk: STARTING: Waiting for rotation to complete. Current AngleZ=" + PlayerRef.GetAngleZ() + ", Target AngleZ=" + fTargetAngleZ + ", Diff=" + fDiff, 1)
+; 		Utility.Wait(0.5)
+; 		fDiff = Math.Abs(PlayerRef.GetAngleZ() - fTargetAngleZ)
+; 	EndWhile
+; endFunction
+
+Function SpeedMultLower()
+	OriginalSpeed = PlayerRef.GetValue(SpeedMult) as int
+	Debug.Trace("AutoWalk: SpeedMultLower(): OriginalSpeed=" + OriginalSpeed, 1)
+	PlayerRef.SetValue(SpeedMult, 1) ; WalkSpeed: 0~3 -> SpeedMult: 0~30
+	PlayerRef.QueueUpdate(false, 0)
+EndFunction
+
+Function SpeedMultReset()
+	Debug.Trace("AutoWalk: SpeedMultReset(): Restoring OriginalSpeed=" + OriginalSpeed, 1)
+	PlayerRef.SetValue(SpeedMult, OriginalSpeed) ; 원래 속도로 복구
+	PlayerRef.QueueUpdate(false, 0)
+EndFunction
+
+Function RotatePlayerToDestination()
+    ObjectReference obj = DstMarker.GetReference()
+    if !obj
+        return
+    endif
+
+    ; 1. AI 구동 전 속도조절 및 AI 제어 활성화
+	SpeedMultLower()
+    Game.SetPlayerAIDriven(true)
+
+    ; 2. 시선 고정 및 회전 시작
+    PlayerRef.SetLookAt(obj, abPathingLookAt = true)
+
+    int timeoutSafety = 0
+    float headingAngle = PlayerRef.GetHeadingAngle(obj)
+    
+    ; 오차 범위를 45도로 완화 (로그상 20도에서 정체되는 구간을 패스하기 위함)
+    ; 대기 시간을 0.1초로 줄여 반응성 극대화
+	float logTime = Utility.GetCurrentGameTime()
+	Debug.Trace("AutoWalk: STARTING: Waiting for rotation to complete. Current HeadingAngle=" + headingAngle + ", TimeoutSafety=" + timeoutSafety + ", IsRunning=" + PlayerRef.IsRunning(), 1)
+    while (headingAngle > 45.0 || headingAngle < -45.0) && (timeoutSafety < 15)
+		if Utility.GetCurrentGameTime() - logTime > 0.5
+			Debug.Trace("AutoWalk: STARTING: Waiting for rotation to complete. Current HeadingAngle=" + headingAngle + ", TimeoutSafety=" + timeoutSafety + ", IsRunning=" + PlayerRef.IsRunning(), 1)
+			logTime = Utility.GetCurrentGameTime()
+		endif
+        Utility.Wait(0.1)
+        headingAngle = PlayerRef.GetHeadingAngle(obj)
+        timeoutSafety += 1
+    endWhile
+	Debug.Trace("AutoWalk: STARTING: Waiting for rotation to complete. Current HeadingAngle=" + headingAngle + ", TimeoutSafety=" + timeoutSafety + ", IsRunning=" + PlayerRef.IsRunning(), 1)
+
+    ; 3. 타겟 각도에 인접했거나 타임아웃 시 즉시 LookAt을 해제하여 관성 튀는 것을 방지
+    PlayerRef.ClearLookAt()
+    Utility.Wait(0.1) ; 물리 정지 안정화 찰나 대기
+
+    ; 4. AI 제어권을 풀고 원래 속도로 복구
+    Game.SetPlayerAIDriven(false)
+	SpeedMultReset()
+EndFunction
+
 function OnCombatClearWaitResult(int resultCode)
     if resultCode == ThreatDetectorScript.AWR_WAIT_OK()
         ; resume autowalk
 		if DstMarker.GetReference()
+			RotatePlayerToDestination()
 			Debug.Notification("Walking to "+ dstName)
 			bStopNotification = true
 			RegisterForCustomEvent(Self, "SceneStopped")
@@ -488,18 +574,14 @@ event OnTimer(int _timer)
 	endIf
 endEvent
 
-
 ;/ ----- STARTING ------------------------------------------------------------------------------------------------ STARTING ----- /;
 state STARTING
 	event OnBeginState(string _oldState)
 		bWalking = True
 		Debug.Trace("AutoWalk: OnBeginState(STARTING)", 1)
-			
 		if !MorsAW_Scene.IsPlaying()
-			
 			MorsAW_Scene.Start()
 		else
-			
 			ReservePlayer()
 			GoToState("WALKING")
 		endIf

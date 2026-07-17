@@ -1196,6 +1196,7 @@ EndFunction
 
 ; Called when the MCM menu is opened.
 Function OnMCMOpen()
+  RefreshUserMapMarkerUsedList()
   RefreshUserMapMarkersForMCM()
 EndFunction
 
@@ -1381,4 +1382,8 @@ Function PrepareUninstall()
     Debug.Trace("AutoWalk: Stopping AWR_ThreatDetectorQuest...", 1)
     AWR_ThreatDetectorQuest.Stop()
   endif
+EndFunction
+
+Function UnsetGhostFlag()
+  PlayerRef.SetGhost(false)
 EndFunction
