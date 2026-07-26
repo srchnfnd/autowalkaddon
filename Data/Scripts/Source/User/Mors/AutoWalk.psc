@@ -95,7 +95,20 @@ int property WalkSpeed  = 0 auto conditional hidden ; 0: slow,   1: fast,   2: j
 int property DrawWeapon = 0 auto conditional hidden ; 0: holstered,   1: unholstered
 int property Sneak      = 0 auto conditional hidden ; 0: normal,   1: sneaking
 
-InputEnableLayer AutoWalkInputLayer = None
+Form Property RotateGuideForm Auto Const
+Bool Property IsRotating = false Auto Hidden
+; Delay times before forcefully terminating the rotation.
+float FailSafeRotateTimeoutSecs1 = 3.0 const
+float FailSafeRotateTimeoutSecs2 = 5.0 const
+; fail safe timer id
+int TimerIdFailSafeRotate = 30 const
+; fail safe rotate method: 1: SetPlayerAIDriven + EvaluatePackage(), 2: MoveTo
+int FailSafeRotateMethod = 2
+; an object reference used to guide the player rotation. It is placed a short distance from the player in the direction of the destination, and the player is rotated toward it instead of the real destination.
+ObjectReference RotateGuide = None
+; distance from the player to place the guide. If too close, the player may not turn far enough to face the real destination.
+; 적당값 60~70. 100이면 FailSafeRotate()에서 MoveTo를 사용하는 단계까지 간다.
+float RotateGuideDistance = 60.0 const
 
 struct locData
 	objectReference marker
@@ -350,72 +363,187 @@ event OnControlDown(string _ctl)
 	endIf
 endEvent
 
-Function RotatePlayerToDestination()
-    ObjectReference obj = DstMarker.GetReference()
-    if !obj
-        return
-    endif
+function DebugRotate(ObjectReference obj)
+	;ObjectReference obj = DstMarker.GetReference()
+	Debug.Trace("AutoWalk: DebugRotate(): RotateGuide pos=(" + RotateGuide.GetPositionX() + "," + RotateGuide.GetPositionY() + "," + RotateGuide.GetPositionZ() + ")", 1)
+	while IsRotating 
+		float headingAngle = PlayerRef.GetHeadingAngle(obj)
+		Debug.Trace("AutoWalk: DebugRotate(): Monitoring PathToReference(): HeadingAngle=" + headingAngle + ", Player pos=(" + PlayerRef.GetPositionX() + "," + PlayerRef.GetPositionY() + ")", 1)
+		Utility.Wait(0.2)
+	endWhile
+endFunction
 
+function FailSafeRotate()
+	; PathToReference() never returns until the actor reaches its target (or pathing
+	; permanently fails), so this function is scheduled via StartTimer() to force it to
+	; return.
+	ObjectReference obj = DstMarker.GetReference()
 	float headingAngle = PlayerRef.GetHeadingAngle(obj)
-	if headingAngle < 45.0 && headingAngle > -45.0
-		Debug.Trace("AutoWalk: RotatePlayerToDestination: Already facing destination. Current HeadingAngle=" + headingAngle, 1)
-		return
+
+	if(FailSafeRotateMethod == 1)
+		Debug.Trace("AutoWalk: FailSafeRotate(): Forcing termination(method=" + FailSafeRotateMethod + "). HeadingAngle=" + headingAngle + ", pos=(" + PlayerRef.GetPositionX() + "," + PlayerRef.GetPositionY() + ")", 1)
+		Game.SetPlayerAIDriven(false)
+		PlayerRef.EvaluatePackage(true)
+		Game.SetPlayerAIDriven(true)
+		PlayerRef.EvaluatePackage()
+		FailSafeRotateMethod = 2
+		StartTimer(FailSafeRotateTimeoutSecs2, TimerIdFailSafeRotate)
+	elseif(FailSafeRotateMethod == 2)
+		if IsRotating
+			Debug.Trace("AutoWalk: FailSafeRotate(): Forcing termination(method=" + FailSafeRotateMethod + "). HeadingAngle=" + headingAngle + ", pos=(" + PlayerRef.GetPositionX() + "," + PlayerRef.GetPositionY() + ")", 1)
+			Debug.Trace("AutoWalk: FailSafeRotate(): RotateGuide pos=(" + RotateGuide.GetPositionX() + "," + RotateGuide.GetPositionY() + "," + RotateGuide.GetPositionZ() + ")", 1)
+			PlayerRef.MoveTo(RotateGuide)
+			Debug.Trace("AutoWalk: FailSafeRotate(): PlayerRef pos=(" + PlayerRef.GetPositionX() + "," + PlayerRef.GetPositionY() + "," + PlayerRef.GetPositionZ() + ")", 1)
+			PlayerRef.EvaluatePackage()
+		else
+			;Debug.Trace("AutoWalk: FailSafeRotate(): Not rotating, skipping MoveTo() call. HeadingAngle=" + headingAngle + ", pos=(" + PlayerRef.GetPositionX() + "," + PlayerRef.GetPositionY() + ")", 1)
+		endif
+	else
+		Debug.Trace("AutoWalk: FailSafeRotate(): Invalid FailSafeRotateMethod=" + FailSafeRotateMethod, 1)
+	endif
+endFunction
+
+;/ Player rotation approaches tried, in order:
+	1. PlayerRef.SetAngle() - safest option, but triggers a loading screen. Splitting the
+	   turn into several small-angle calls does not avoid this.
+	2. PlayerRef.SetLookAt() - no loading screen, smooth rotation. Occasionally, near cell
+	   boundaries, the player sets off walking in the wrong direction first, then freezes
+	   and shudders in place once real pathfinding takes over.
+	3. PlayerRef.PathToReference() - no loading screen, smooth rotation. The smaller the
+	   afWalkRunPercent value, the smoother the turn; larger values increase the chance the
+	   player sets off in the wrong initial direction and never reaches the destination.
+	   This is the approach currently in use below, called against a nearby temporary guide
+	   object (RotateGuide) instead of the real, far-away destination, since the call blocks
+	   until it arrives. See FailSafeRotate() for how the block is eventually cleared.
+/;
+bool Function RotatePlayerToDestination()
+	Debug.Trace("AutoWalk: RotatePlayerToDestination(): Traveler currently bound to=" + Traveler.GetRef() + ", PlayerRef=" + PlayerRef + ", IsRunning=" + PlayerRef.IsRunning(), 1)
+
+	if IsRotating
+		Debug.Trace("AutoWalk: RotatePlayerToDestination: Already in progress, skipping reentrant call.", 1)
+		return false
+	endif
+	IsRotating = true
+
+
+
+	ObjectReference targetObj = DstMarker.GetReference()
+	if !targetObj
+		IsRotating = false
+		return false
 	endif
 
-    ; 1. Reduce player speed to minimize the fluctuation of the heading angle during rotation and set the player 
-	;    to AI-driven mode to prevent player input from interfering with rotation
-    Game.SetPlayerAIDriven(true)
-    AutoWalkInputLayer = InputEnableLayer.Create()
-    AutoWalkInputLayer.EnableRunning(false)
-    AutoWalkInputLayer.EnableSprinting(false)
+	if RotateGuide
+		RotateGuide.Disable()
+		RotateGuide.Delete()
+	endif
 
-    ; 2. Turn the player to face the destination marker using LookAt to avoid 'crazy dancing' and ensure smooth rotation
-    PlayerRef.SetLookAt(obj, abPathingLookAt = true)
+	float origX = RotateGuide.GetPositionX()
+	float origY = RotateGuide.GetPositionY()
+	float origZ = RotateGuide.GetPositionZ()
+	RotateGuide = PlayerRef.PlaceAtMe(RotateGuideForm, 1) as ObjectReference
+	RotateGuide.WaitFor3DLoad()
+	RotateGuide.SetScale(0.1) ; make it small to be invisible.
+	RotateGuide.MoveToNearestNavmeshLocation()
+	; is moved to nearest navmesh location?
+	if RotateGuide.GetPositionX() != origX || RotateGuide.GetPositionY() != origY || RotateGuide.GetPositionZ() != origZ
+		Debug.Trace("AutoWalk: RotatePlayerToDestination: Successfully moved RotateGuide to nearest navmesh location. pos=(" + RotateGuide.GetPositionX() + "," + RotateGuide.GetPositionY() + "," + RotateGuide.GetPositionZ() + ")", 1)
+		targetObj = RotateGuide
+	endif
 
-    int timeoutSafety = 0
-    headingAngle = PlayerRef.GetHeadingAngle(obj)
-    
-    ; 3. Wait until the player is facing the destination or timeout occurs
-	;    45 degrees: margin of error by taking into account the fluctuation of the heading angle due to the player's movement and the game's physics
-	float logTime = Utility.GetCurrentGameTime()
-	Debug.Trace("AutoWalk: RotatePlayerToDestination: Waiting for rotation to complete. Current HeadingAngle=" + headingAngle + ", TimeoutSafety=" + timeoutSafety + ", IsRunning=" + PlayerRef.IsRunning(), 1)
-    while (headingAngle > 45.0 || headingAngle < -45.0) && (timeoutSafety < 15)
-		if Utility.GetCurrentGameTime() - logTime > 0.5
-			Debug.Trace("AutoWalk: RotatePlayerToDestination: Waiting for rotation to complete. Current HeadingAngle=" + headingAngle + ", TimeoutSafety=" + timeoutSafety + ", IsRunning=" + PlayerRef.IsRunning(), 1)
-			logTime = Utility.GetCurrentGameTime()
-		endif
-        Utility.Wait(0.1)
-        headingAngle = PlayerRef.GetHeadingAngle(obj)
-        timeoutSafety += 1
-    endWhile
-	Debug.Trace("AutoWalk: RotatePlayerToDestination: Rotation complete. Current HeadingAngle=" + headingAngle + ", TimeoutSafety=" + timeoutSafety + ", IsRunning=" + PlayerRef.IsRunning(), 1)
+	float headingAngle = PlayerRef.GetHeadingAngle(targetObj)
+	if headingAngle < 45.0 && headingAngle > -45.0
+		Debug.Trace("AutoWalk: RotatePlayerToDestination: Already facing destination. Current HeadingAngle=" + headingAngle, 1)
+		IsRotating = false
+		return true
+	endif
 
-    ; 3. Immediately clear LookAt when close to the target angle or timeout to prevent jitter due to inertia
-    PlayerRef.ClearLookAt()
-    Utility.Wait(0.1) ; brief wait for physics stabilization
+	; Place a temporary guide object a short distance from the player, in the direction of
+	; the nearest navmesh location or real destination, and path the player toward it instead of the destination itself.
+	float playerX = PlayerRef.GetPositionX()
+	float playerY = PlayerRef.GetPositionY()
+	float playerZ = PlayerRef.GetPositionZ()
 
-    ; 4. Reset player speed and exit AI-driven mode
-	AutoWalkInputLayer.EnableRunning(true)
-    AutoWalkInputLayer.EnableSprinting(true)
-    AutoWalkInputLayer = None
-	Game.SetPlayerAIDriven(false)
-	PlayerRef.EvaluatePackage()
-	PlayerRef.PlayIdle(IdleStop)
+	float dirX = targetObj.GetPositionX() - playerX
+	float dirY = targetObj.GetPositionY() - playerY
+	float dirZ = targetObj.GetPositionZ() - playerZ
+	float dirLength = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ)
+	if dirLength != 0
+		dirX = dirX / dirLength
+		dirY = dirY / dirLength
+		dirZ = dirZ / dirLength
+	endif
+
+	float zOffset = 100.0 ; spawn height above the player, to avoid spawn collision with the ground
+
+	RotateGuide.SetPosition(playerX + dirX * RotateGuideDistance, playerY + dirY * RotateGuideDistance, playerZ + dirZ * RotateGuideDistance + zOffset)
+	float freeFallTime = MarkerDBScript.GetFreeFallTime(zOffset) ; time for the guide to fall and settle on the ground
+	Debug.Trace("AutoWalk: RotatePlayerToDestination: Placed RotateGuide at (" + (playerX + dirX * RotateGuideDistance) + ", " + (playerY + dirY * RotateGuideDistance) + ", " + (playerZ + dirZ * RotateGuideDistance + zOffset) + "), freeFallTime=" + freeFallTime, 1)
+	Utility.Wait(freeFallTime + 0.1)
+	; FailSafeRotate()에서 MoveTo를 하게될 경우에 대비하여 목적지 방향으로 돌려놓는다.
+	RotateGuide.SetAngle(0.0, 0.0, PlayerRef.GetHeadingAngle(targetObj))
+	; disable user input to avoid the player moving away from the guide and never reaching it
+	InputEnableLayer myLayer = InputEnableLayer.Create()
+	myLayer.DisablePlayerControls(abMovement = true, abFighting = true, abCamSwitch = false, \
+		abLooking = false, abSneaking = true, abMenu = false, abActivate = false, \
+ 		abJournalTabs = false)
+
+	; Rotating player is not necessary if the player is in 1st person or has weapon drawn, 
+	; since the camera and player will rotate correctly to face the destination when scene starts.
+	; TODO: MoveTo에 의한 PathToReference()강제 리턴 효과를 충분히 확인한 후 1인칭 및 무기장착 상태 판단 조건 살려놓을 것.
+	if True;GardenOfEden.Is3rdPersonVisible() && !PlayerRef.IsWeaponDrawn()
+		Debug.Trace("AutoWalk: RotatePlayerToDestination: 3rd person visible=" + GardenOfEden.Is3rdPersonVisible() + ", weapon drawn=" + PlayerRef.IsWeaponDrawn(), 1)
+
+		Game.SetPlayerAIDriven(true)
+		myLayer.EnableRunning(false)
+		myLayer.EnableSprinting(false)
+
+		var[] args = new var[1]
+		args[0] = targetObj as var
+		CallFunctionNoWait("DebugRotate", args)
+		FailSafeRotateMethod = 1
+		StartTimer(FailSafeRotateTimeoutSecs1, TimerIdFailSafeRotate)
+		PlayerRef.PathToReference(RotateGuide, 0.4)
+		CancelTimer(TimerIdFailSafeRotate)
+		RotateGuide.Disable()
+		RotateGuide.Delete()
+
+		myLayer.EnableRunning(true)
+		myLayer.EnableSprinting(true)
+
+		headingAngle = PlayerRef.GetHeadingAngle(targetObj)
+		Debug.Trace("AutoWalk: RotatePlayerToDestination: PathToReference() returned: headingAngle=" + headingAngle, 1)
+		Game.SetPlayerAIDriven(false)
+		
+		PlayerRef.EvaluatePackage()
+		PlayerRef.PlayIdle(IdleStop)
+		
+		IsRotating = false
+	else
+		Debug.Trace("AutoWalk: RotatePlayerToDestination: Player is not in 3rd person or has weapon drawn, skipping rotation.", 1)
+		IsRotating = false
+	endif
+
+	myLayer.EnablePlayerControls()
+	myLayer = None
+
+	return true
 EndFunction
 
 function OnCombatClearWaitResult(int resultCode)
     if resultCode == ThreatDetectorScript.AWR_WAIT_OK()
         ; resume autowalk
 		if DstMarker.GetReference()
-			RotatePlayerToDestination()
 			Debug.Notification("Walking to "+ dstName)
 			bStopNotification = true
 			RegisterForCustomEvent(Self, "SceneStopped")
 			RegisterForRemoteEvent(MorsAW_Scene, "OnBegin")
 			RegisterForRemoteEvent(MorsAW_Scene, "OnEnd")
 			if MorsAW_Scene.IsPlaying()
+				Debug.Trace("AutoWalk: OnCombatClearWaitResult(): RESTARTING", 1)
 				GoToState("RESTARTING")
 			else
+				Debug.Trace("AutoWalk: OnCombatClearWaitResult(): STARTING", 1)
 				GoToState("STARTING")
 			endIf
 		endif
@@ -424,7 +552,7 @@ function OnCombatClearWaitResult(int resultCode)
     else ; AWR_WAIT_INTERRUPTED
     endif
 	Debug.MessageBox("AutoWalk\n\nPlayer is in combat!\nClear all threats,\nsneak until enemies calm down,\nor move to a safe location before starting.")
-	Debug.Trace("AutoWalk: StartWalking(): Combat State is not clear or resumed, not starting walking.", 1)
+	Debug.Trace("AutoWalk: OnCombatClearWaitResult(): Combat State is not clear or resumed, not starting walking.", 1)
 endfunction
 
 ; Begin AutoWalk after checking combat state and clearing possible lingering combat state.
@@ -541,6 +669,8 @@ event OnTimer(int _timer)
 			endif
 			StartTimer(arrivalCheckInterval, TimerCheckArrival)
 		endif
+	elseif _timer == TimerIdFailSafeRotate
+		FailSafeRotate()
 	endIf
 endEvent
 
@@ -549,12 +679,18 @@ state STARTING
 	event OnBeginState(string _oldState)
 		bWalking = True
 		Debug.Trace("AutoWalk: OnBeginState(STARTING)", 1)
-		if !MorsAW_Scene.IsPlaying()
-			MorsAW_Scene.Start()
+		if !IsRotating
+			RotatePlayerToDestination()
+			Debug.Trace("AutoWalk: OnBeginState(STARTING): RotatePlayerToDestination() returned. IsRotating=" + IsRotating, 1)
+			if !MorsAW_Scene.IsPlaying()
+				MorsAW_Scene.Start()
+			else
+				ReservePlayer()
+				GoToState("WALKING")
+			endIf
 		else
-			ReservePlayer()
-			GoToState("WALKING")
-		endIf
+			Debug.Trace("AutoWalk: OnBeginState(STARTING): Not starting walking because previous walking preparation is still in progress. IsRotating=" + IsRotating, 1)
+		endif
 	endEvent
 	event scene.OnBegin(scene _scene)
 		Debug.Trace("AutoWalk: scene.OnBegin(STARTING)", 1)
@@ -576,7 +712,7 @@ endState
 state RESTARTING
   event OnBeginState(string _oldState)
 		
-		Debug.trace("AutoWalk: OnBeginState(RESTARTING)", 1)
+		Debug.trace("AutoWalk: OnBeginState(RESTARTING): IsPlaying=" + MorsAW_Scene.IsPlaying(), 1)
 		if MorsAW_Scene.IsPlaying()
 			
 			MorsAW_Scene.Stop()
@@ -753,6 +889,6 @@ Function UpdateCustomDestination(AutoWalkMarkerDB:CustomDestinationMarkerInfo ma
 
 	if GetState() == "walking"
 	Debug.Notification("Walking to " + dstName)
-	;GoToState("RESTARTING")
 	endif
+	;GoToState("RESTARTING")
 EndFunction
