@@ -219,7 +219,7 @@ Function OnCellChange(Cell newCell)
   Debug.Trace("AutoWalk: OnCellChange: Cell=" + newCell, 1)
   ; only if we have a pending custom destination marker to update
   if currentDestinationMarkerInfo != None && currentDestinationMarkerInfo.playerMarkerZProbed == false
-    GetPlayerWorldSpace()
+    ;GetPlayerWorldSpace()
     SendUpdateCustomDestination()
   Else
     Debug.Trace("AutoWalk: OnCellChange: No pending custom destination marker to update.", 1)

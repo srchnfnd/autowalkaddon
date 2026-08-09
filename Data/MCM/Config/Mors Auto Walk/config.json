@@ -109,6 +109,23 @@
             "sourceForm": "Mors Auto Walk.esl|f99",
             "propertyName": "bCaptive"
           }
+        },
+        {
+          "type": "spacer",
+          "numLines": 1
+        },
+        {
+          "type": "text",
+          "text": "If your run/walk animation set supports footstep events, this option will use them to detect jittering ('Crazy move' in 3rd person). If you are using an animation set that does not support footstep events, or something exotic, disable this option."
+        },
+        {
+          "type": "switcher",
+          "text": "Use Animation Footstep Check (recommended)",
+          "valueOptions": {
+            "sourceType": "PropertyValueBool",
+            "sourceForm": "Mors Auto Walk Addon.esp|287",
+            "propertyName": "bUseAnimationFootstepCheck"
+          }
         }
       ]
     },
@@ -142,6 +159,32 @@
     {
       "pageDisplayName": "Advanced",
       "content": [
+        {
+          "type": "section",
+          "text": "Jitter Detection"
+        },
+        {
+          "type": "text",
+          "text": "Auto-Walk uses footstep animation events to detect jittering (\"Crazy Dance\") during walking. If you suspect the cached detection results are incorrect, you can reset them below."
+        },
+        {
+          "type": "spacer",
+          "numLines": 1
+        },
+        {
+          "type": "button",
+          "text": "Reset Footstep Detection",
+          "help": "Clears cached footstep detection results for all WalkSpeeds. A fresh check will run the next time you start walking.",
+          "action": {
+            "type": "CallFunction",
+            "form": "Mors Auto Walk.esl|f99",
+            "function": "ResetFootstepDetection"
+          }
+        },
+        {
+          "type": "spacer",
+          "numLines": 2
+        },
         {
           "type": "section",
           "text": "Threat Detection Patch"
