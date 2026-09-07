@@ -29,7 +29,6 @@ Struct CustomDestinationMarkerInfo
   float playerMarkerX
   float playerMarkerY
   float playerMarkerZ
-  cell playerMarkerCell
   ObjectReference nearestStaticMarker
   float nearestStaticMarkerDistance
   string nearestStaticMarkerName
@@ -252,16 +251,6 @@ Int[] Function GetSearchCellIndexes(Grid grid, float x, float y)
   cells[7] = GetContainingCellIndex(grid, x - grid.cellWidth, y)
   cells[8] = GetContainingCellIndex(grid, x - grid.cellWidth, y + grid.cellHeight)
   return cells
-EndFunction
-
-Cell Function GetCellAtPosition(float x, float y, float z)
-  ObjectReference probe = PlayerRef.PlaceAtMe(GroundProbeForm)
-  probe.SetPosition(x, y, z)
-  Cell foundCell = probe.GetParentCell()
-  Debug.Trace("AutoWalk: GetCellAtPosition: Probe Position=(" + probe.x + "," + probe.y + ", " + probe.z + "), Cell=" + foundCell + ", World=" + probe.GetWorldSpace(), 1)
-  Debug.Trace("AutoWalk: GetCellAtPosition: Original Position=(" + x + "," + y + ", " + z + ")", 1)
-  probe.Delete()
-  return foundCell
 EndFunction
 
 ; =========================
@@ -532,9 +521,9 @@ EndFunction
 ; =====================================
 ; === CUSTOM DESTINATION MANAGEMENT ===
 ; =====================================
-
 ; Returns the custom destination marker ObjectReference, calibrating if needed.
 ObjectReference Function GetCustomDestinationMarkerAsync()
+  ObjectReference staticMarker = None
   if databaseState != AWR_DB_STATE_READY()
     Debug.Trace("AutoWalk: ERROR: Cannot start calibration; database is not ready.", 1)
     return None
@@ -548,7 +537,7 @@ ObjectReference Function GetCustomDestinationMarkerAsync()
   endif
 
   WorldSpace ws = GetPlayerWorldSpace()
-  ObjectReference staticMarker = None
+
   if ws == WorldSpaceCommonwealth
     staticMarker = PlayerMapMarkerCommonwealth
 	; TODO: DiamondCity, GoodNeighbor, SanctuaryHillsWorld
@@ -560,7 +549,7 @@ ObjectReference Function GetCustomDestinationMarkerAsync()
 
   if staticMarker == None
     Debug.Trace("AutoWalk: Unsupported worldspace: " + WorldSpaceToString(ws), 1)
-    Debug.Notification("AutoWalk: Unable to start traveling here. You can move to outdoor and try again.")
+    Debug.Notification("AutoWalk: Unable to start walking to custom marker from here. You can use Destination Menu instead.")
     return None
   endif
 
@@ -586,6 +575,22 @@ ObjectReference Function GetCustomDestinationMarkerAsync()
     dstInfo.nearestStaticMarkerName = ""
     dstInfo.nearestStaticMarker = None
     dstInfo.nearestStaticMarkerDistance = 0.0
+  else
+    ; 湲곗〈 罹먯떆瑜??ъ궗?⑺븷 ?뚮룄 currentDestinationMarkerInfo??X/Y????긽 理쒖떊 留덉빱 醫뚰몴濡?媛깆떊?쒕떎.
+    ; (由щ줈????stale 罹먯떆媛 ?댁븘?④굅?? ?ㅻⅨ ?꾩튂濡?留덉빱瑜???릿 寃쎌슦 X/Y媛 ??媛믪쑝濡??⑥쓣 ???덈떎.)
+    float markerDist = Math.Sqrt((dstInfo.playerMarkerX - markerInfo.X) * (dstInfo.playerMarkerX - markerInfo.X) + \
+                                (dstInfo.playerMarkerY - markerInfo.Y) * (dstInfo.playerMarkerY - markerInfo.Y))
+    dstInfo.playerMarkerX = markerInfo.X
+    dstInfo.playerMarkerY = markerInfo.Y
+    if markerDist > 50.0
+      ; 紐⑹쟻吏 X/Y媛 ?щ씪議뚮떎硫?湲곗〈???꾨줈釉뚰븳 Z??臾댄슚?? ?ы봽濡쒕툕?섎룄濡?珥덇린?뷀븳??
+      Debug.Trace("AutoWalk: Custom marker position changed, invalidating cached ground Z.", 1)
+      dstInfo.playerMarkerZ = PlayerRef.Z
+      dstInfo.playerMarkerZProbed = false
+      dstInfo.nearestStaticMarker = None
+      dstInfo.nearestStaticMarkerDistance = 0.0
+      dstInfo.nearestStaticMarkerName = ""
+    endif
   endif
 
   CallFunctionNoWait("CalibrateCustomDestinationMarker", None)
@@ -703,7 +708,6 @@ Function CalibrateCustomDestinationMarker()
     dstInfo.playerMarkerX = markerInfo.X
     dstInfo.playerMarkerY = markerInfo.Y
     dstInfo.playerMarkerZ = nearestMarker.Z
-    dstInfo.playerMarkerCell = GetCellAtPosition(markerInfo.x, markerInfo.y, nearestMarker.z)
 
     float[] fix = GetMarkerFix(nearestMarker)
     if fix && fix.Length > 2
@@ -740,26 +744,28 @@ EndFunction
 ; Sends the custom event to update the custom destination marker.
 bool Function SendUpdateCustomDestination(bool fallbackDraft = false)
   if currentDestinationMarkerInfo
-    if currentDestinationMarkerInfo.playerMarkerCell == PlayerRef.GetParentCell()
-      if currentDestinationMarkerInfo.playerMarkerZProbed == false
-        Debug.Trace("AutoWalk: Determining ground height for custom destination marker...", 1)
-        float groundZ = GetGroundZ(currentDestinationMarkerInfo.playerMarkerX, currentDestinationMarkerInfo.playerMarkerY, currentDestinationMarkerInfo.playerMarkerZ)
+    ; Z??吏??湲곕컲(GardenOfEden3.GetTerrainHeightAtReference)?쇰줈 ?쎌쑝誘濡?
+    ; ???댁긽 紐⑹쟻吏 ?怨??뚮젅?댁뼱 ???媛숈쓣 ?꾩슂媛 ?녿떎.
+    ; 硫由??덈뒗 紐⑹쟻吏??利됱떆 ?뺥솗??吏??Z媛 ?뺥빐?몄빞 紐?? ?꾩뿉 寃쎈줈李얘린濡?硫덉텛吏 ?딅뒗??
+    if currentDestinationMarkerInfo.playerMarkerZProbed == false
+      Debug.Trace("AutoWalk: Determining ground height for custom destination marker...", 1)
+      float groundZ = GetGroundZ(currentDestinationMarkerInfo.playerMarkerX, currentDestinationMarkerInfo.playerMarkerY, currentDestinationMarkerInfo.playerMarkerZ)
+      if groundZ > -1.0
         currentDestinationMarkerInfo.playerMarkerZ = groundZ
         currentDestinationMarkerInfo.playerMarkerZProbed = true
       else
-        Debug.Trace("AutoWalk: Ground height for custom destination marker already probed: Z=" + currentDestinationMarkerInfo.playerMarkerZ, 1)
+        ; navmesh媛 ?녿뒗 紐⑹쟻吏: GetGroundZ媛 ?ㅽ뙣(-1)瑜??뚮졇?? 湲곗〈 Z瑜???뼱?곗? ?딅뒗??
+        ; 寃쎈줈李얘린 遺덈뒫??媛먯??섎뒗 jitter/ResetPathing ?쒖뒪?쒖씠 ?먯뿰?ㅻ읇寃?泥섎━?섎룄濡??붾떎.
+        Debug.Trace("AutoWalk: Ground height detection failed (no navmesh). Keeping Z=" + currentDestinationMarkerInfo.playerMarkerZ, 1)
+        currentDestinationMarkerInfo.playerMarkerZProbed = true
       endif
-      Var[] args = new Var[1]
-      args[0] = currentDestinationMarkerInfo
-      SendCustomEvent("UpdateCustomDestination", args)
-      return true
-    elseif fallbackDraft
-      Var[] args = new Var[1]
-      args[0] = currentDestinationMarkerInfo
-      SendCustomEvent("UpdateCustomDestination", args)
-      return true
+    else
+      Debug.Trace("AutoWalk: Ground height for custom destination marker already probed: Z=" + currentDestinationMarkerInfo.playerMarkerZ, 1)
     endif
-    ; Not in the same cell or height already probed; will try again later.
+    Var[] args = new Var[1]
+    args[0] = currentDestinationMarkerInfo
+    SendCustomEvent("UpdateCustomDestination", args)
+    return true
   endif
   return false
 EndFunction
@@ -1280,22 +1286,91 @@ float function GetFreeFallTime(float heightUnits)
     return Math.Sqrt(2.0 * heightUnits / gravityUnits)
 endFunction
 
-; Returns the ground Z coordinate at the specified (x, y, z) position by placing a probe object and reading its final Z after settling.
+; Returns the ground Z coordinate at the specified (x, y, z) position.
+; Strategy:
+;   1) RayCast downward - gives exact terrain Z, but ONLY works when the target cell is
+;      LOADED (physics only exists in loaded cells).
+;   2) Navmesh snap (MoveToNearestNavmeshLocation) - works even for far-away (unloaded)
+;      cells because it searches the global navmesh, but fails in navmesh holes.
+; Returns -1.0 if neither method determines a ground Z.
 Float Function GetGroundZ(float x, float y, float z)
-  ; The ground probe must have a mesh, weight, and dimensions for the drop effect and must be in the same cell as the player.
   Debug.Trace("AutoWalk: GetGroundZ: ground probe = " + GroundProbeForm, 1)
+
+  ; --- 1) RayCast down (works for loaded cells, gives exact terrain Z) ---
+  float rayZ = RayCastGroundZ(x, y)
+  if rayZ > -1.0
+    return rayZ
+  endif
+
+  ; --- 2) Fallback: navmesh snap (remote-capable) ---
   ObjectReference probeObject = PlayerRef.PlaceAtMe(GroundProbeForm)
-  probeObject.SetPosition(x, y, z + 500); 500 units = 9.525m above the target position to ensure it falls to the ground
-  float fallTime = GetFreeFallTime(500)
-  Utility.Wait(fallTime + 0.5) ; wait for the probe to fall and settle; add a small buffer to ensure it's on the ground
-  ; String msg1 = "AutoWalk: GetGroundZ: Probe Object Position = (" + probeObject.x + ", " + probeObject.y + ", " + probeObject.z + ")"
-  ; String msg2 = "AutoWalk: GetGroundZ: Original Position = (" + x + ", " + y + ", " + z + ")"
-  ; Debug.Trace(msg1, 1)
-  ; Debug.Trace(msg2, 1)
-  ; Debug.Trace("AutoWalk: free fall height:" + 500 * 0.01905 + "m, time: " + fallTime + " seconds.", 1)
-  Debug.Notification("AutoWalk: Ground height determined: Z = " + probeObject.z)
+  probeObject.SetPosition(x, y, z + 500)
+  probeObject.PreloadExteriorCell()
+  probeObject.WaitFor3DLoad()
+
+  float beforeX = probeObject.x
+  float beforeY = probeObject.y
+  float beforeZ = probeObject.z
+
+  probeObject.MoveToNearestNavmeshLocation()
+
+  float afterX = probeObject.x
+  float afterY = probeObject.y
+  float afterZ = probeObject.z
+  float dX = afterX - beforeX
+  float dY = afterY - beforeY
+  float dZ = afterZ - beforeZ
+  float moved = Math.Sqrt(dX * dX + dY * dY + dZ * dZ)
+
+  Debug.Trace("AutoWalk: GetGroundZ: probe before=(" + beforeX as Int + "," + beforeY as Int + "," + beforeZ as Int + ") after=(" + afterX as Int + "," + afterY as Int + "," + afterZ as Int + ") moved=" + moved, 1)
+
   probeObject.Delete()
-  return probeObject.z
+
+  if moved >= 10.0
+    Debug.Trace("AutoWalk: GetGroundZ: navmesh ground Z=" + afterZ, 1)
+    Debug.Notification("AutoWalk: Ground height determined: Z = " + afterZ)
+    return afterZ
+  endif
+
+  Debug.Trace("AutoWalk: GetGroundZ: no navmesh at target, returning failure (-1).", 1)
+  return -1.0
+EndFunction
+
+; Casts a ray straight down from high above the target and returns the terrain surface Z.
+; Returns -1.0 if the raycast is invalid or misses (e.g. the target cell is not loaded).
+Float Function RayCastGroundZ(float x, float y)
+  GardenOfEden3:RayCastParams rp = new GardenOfEden3:RayCastParams
+  rp.fRayStartPosX = x
+  rp.fRayStartPosY = y
+  rp.fRayStartPosZ = 30000.0 ; very high, safely above any terrain/structure
+  rp.fRayLength = 60000.0
+  rp.bCastDownward = true
+  GardenOfEden3:RayCastResult rr = GardenOfEden3.RayCast(rp)
+  if rr != None && rr.bValid && rr.bHasHit
+    Debug.Trace("AutoWalk: RayCastGroundZ: hit Z=" + rr.fHitPosZ + " (node=" + rr.sHitNode + ", dist=" + rr.fHitDistance + ")", 1)
+    return rr.fHitPosZ
+  endif
+  Debug.Trace("AutoWalk: RayCastGroundZ: no hit (valid=" + (rr != None && rr.bValid) + ").", 1)
+  return -1.0
+EndFunction
+
+; Called while walking when the destination cell enters the loaded range.
+; Re-probes the destination ground Z (navmesh may have failed at start for a remote
+; navmesh hole; once the cell is loaded, RayCast can determine the exact terrain Z).
+; Updates currentDestinationMarkerInfo and notifies AutoWalk to move the marker.
+Function ReRequestGroundZ()
+  if !currentDestinationMarkerInfo
+    return
+  endif
+  float newZ = RayCastGroundZ(currentDestinationMarkerInfo.playerMarkerX, currentDestinationMarkerInfo.playerMarkerY)
+  if newZ > -1.0
+    Debug.Trace("AutoWalk: ReRequestGroundZ: updated Z from " + currentDestinationMarkerInfo.playerMarkerZ + " to " + newZ, 1)
+    currentDestinationMarkerInfo.playerMarkerZ = newZ
+    currentDestinationMarkerInfo.playerMarkerZProbed = true
+    SendUpdateCustomDestination()
+  else
+    Debug.Trace("AutoWalk: ReRequestGroundZ: raycast did not hit, keeping Z=" + currentDestinationMarkerInfo.playerMarkerZ, 1)
+  endif
 EndFunction
 
 ; Sets the player map marker at the specified worldspace and position.

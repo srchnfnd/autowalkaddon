@@ -117,6 +117,18 @@ int TimerCheckArrival = 20
 bool bWalking = false ; MorsAW_Scene.IsPlaying() is not reliable
 ObjectReference CurrentCustomDstMarker = None
 bool bPlayerInCombat = false
+
+; ----- Stale-event 방지용 -----
+; RESTARTING.OnBeginState()에서 재시작이 확정되는 순간 WalkGeneration을 증가시키고
+; bWalkingReady를 False로 내린다. WALKING.OnBeginState()가 완전히 끝나야 bWalkingReady가 True가 된다.
+; scene.OnEnd() 핸들러들이 SendCustomEvent("SceneStopped")로 보내는 이벤트에는 그 시점의
+; WalkGeneration을 실어 보내서, 나중에 실제로 이벤트가 처리될 때 그 사이 재시작이 한 번 더
+; 일어났는지(WalkGeneration 불일치) 또는 아직 WALKING 초기화가 끝나지 않았는지(bWalkingReady=false)를
+; 판별해 낡은/때이른 이벤트를 무시할 수 있게 한다.
+int WalkGeneration = 0
+bool bWalkingReady = false
+int iSceneStartRetry = 0
+int iMaxSceneStartRetry = 3 const
 float arrivalCheckInterval = 3.0
  
 bool bContinueWalkingToCustomMarker = false
@@ -300,6 +312,11 @@ event OnControlDown(string _ctl)
 		else
 			StartTimer(HotkeyHoldTime, TimerMenuKeyDown)
 		endIf
+	elseIf _ctl == "MorsAutoWalkJitterMarkHotkey"
+		; 디버그용: 사용자가 화면에서 지터를 시각적으로 인지한 순간 누르는 핫키.
+		; ExecuteSample()이 놓친(false negative) 케이스를 나중에 로그로 분석하기 위한 용도.
+		Debug.Notification("AutoWalk: Jitter state marked.")
+		AWR_JitterMonitor.MarkJitterObserved()
 	else
 		if AWR_JitterMonitor.iFootstepCheckPhase > 0
 			Debug.Trace("AutoWalk: OnControlDown(): Footstep check in progress, ignoring input.", 1)
@@ -351,6 +368,7 @@ event OnControlDown(string _ctl)
 			return
 		endIf
 		AWR_JitterMonitor.UpdateWalkSpeed(WalkSpeed)
+		BeginNewWalkGeneration()
 		GotoState("RESTARTING")
 	endIf
 endEvent
@@ -369,11 +387,13 @@ function OnCombatClearWaitResult(int resultCode)
 			RegisterForCustomEvent(AWR_JitterMonitor, "MonitoringStopped")
 			if MorsAW_Scene.IsPlaying()
 				Debug.Trace("AutoWalk: OnCombatClearWaitResult(): RESTARTING", 1)
+				BeginNewWalkGeneration()
 				GoToState("RESTARTING")
 			else
 				Debug.Trace("AutoWalk: OnCombatClearWaitResult(): STARTING", 1)
 				StopReason = ""
 				AWR_JitterMonitor.PrepareForWalking()
+				BeginNewWalkGeneration()
 				GoToState("STARTING")
 			endIf
 		endif
@@ -395,13 +415,22 @@ EndEvent
 
 ; Begin AutoWalk after checking combat state and clearing possible lingering combat state.
 bool function StartWalking()
-	Debug.Trace("AutoWalk: OnCombatClearWaitResult(): Before calling CleanupCustomEventSubscriptions()", 1)
+	Debug.Trace("AutoWalk: StartWalking(): Before calling CleanupCustomEventSubscriptions()", 1)
 	CleanupCustomEventSubscriptions()
 	if DstMarker.GetReference() == none
 		Debug.Notification("AutoWalk: No destination selected! Cannot start walking.")
 		return false
 	endif
-	if(ThreatDetectorScript.BeginCombatClearWait(self as Quest, "OnCombatClearWaitResult")) == false
+	if bCaptive
+		Debug.Trace("AutoWalk: Walking in No Aggro mode...", 1)
+		; No Aggro는 전투 정리 대기를 생략하므로, 이미 전투 중(CombatState=1)이면
+		; Travel 패키지가 배치되지 못해 Scene이 즉시 끝나버린다.
+		; Captive faction을 먼저 적용하고 현재 전투를 강제 해소한 뒤 출발한다.
+		Captive.ForceRefTo(PlayerRef)
+		PlayerRef.StopCombat()
+		OnCombatClearWaitResult(ThreatDetectorScript.AWR_WAIT_OK())
+		return true
+	elseif(ThreatDetectorScript.BeginCombatClearWait(self as Quest, "OnCombatClearWaitResult")) == false
 		; if already waiting stop existing wait
 		Debug.Notification("AutoWalk: Previous walking attempt cancelled.")
 		ThreatDetectorScript.CancelCombatClearWait()
@@ -445,6 +474,12 @@ function ReleasePlayer()
 endFunction
 
 function CheckCombatStateAndStop(bool hint)
+	; No Aggro(Captive) 모드에서는 faction 설정으로 공격이 차단되므로
+	; 전투 감지로 인한 중단을 건너뛴다. (초기 버전의 락업 방지 테스트를 위함)
+	if bCaptive
+		Debug.Trace("AutoWalk: CheckCombatStateAndStop(): not going to stop because use selected 'No Aggro' mode", 1)
+		return
+	endif
 	Debug.Trace("AutoWalk: CheckCombatStateAndStop(): bCombatWarning=" + bCombatWarning + ", bWalking=" + bWalking + ", state=" + GetState(), 1)
 	If bCombatWarning && bWalking && GetState() != "STOPPING"
 		float threat = GardenOfEden2.GetCurrentCombatThreatLevel(PlayerRef)
@@ -485,13 +520,73 @@ event Mors:AutoWalk.SceneStopped(Mors:AutoWalk _sender, Var[] _args)
 	Debug.Notification("AutoWalk: SceneStopped[" + GetState() + "]")
 endEvent
 
+; scene.OnEnd() 핸들러들은 이 함수를 통해서만 SceneStopped 커스텀 이벤트를 보낸다.
+; 보내는 시점의 WalkGeneration을 args[0]에 실어서, 나중에 이벤트가 실제로 처리될 때
+; 그 사이 재시작이 한 번 더 일어났는지 판별할 수 있게 한다.
+function SendSceneStoppedEvent()
+	var[] args = new var[1]
+	args[0] = WalkGeneration
+	Debug.Trace("AutoWalk: SendSceneStoppedEvent(): tagging with generation=" + WalkGeneration, 1)
+	SendCustomEvent("SceneStopped", args)
+endFunction
+
+; STARTING으로 향하는 모든 경로(최초 시작이든, RESTARTING을 거치든)에서 반드시 이 함수를 먼저 호출한다.
+; 여기서 WalkGeneration을 증가시키고 bWalkingReady를 내려서, 그 뒤에 도착하는 낡은/때이른
+; SceneStopped 이벤트를 걸러낼 수 있는 기준점을 만든다.
+function BeginNewWalkGeneration()
+	WalkGeneration += 1
+	bWalkingReady = false
+	Debug.Trace("AutoWalk: BeginNewWalkGeneration(): generation=" + WalkGeneration, 1)
+endFunction
+
+; 이벤트가 현재 재시작 사이클보다 낡았는지(그 사이 재시작이 한 번 더 일어남) 확인한다.
+; RESTARTING/STARTING/STOPPING 등 어느 상태에서든 공통으로 쓸 수 있다.
+bool function IsStaleGeneration(Var[] _args)
+	int evtGen = -1
+	if _args && _args.Length > 0
+		evtGen = _args[0] as int
+	endIf
+	if evtGen != WalkGeneration
+		Debug.Trace("AutoWalk: IsStaleGeneration(): stale (evtGen=" + evtGen + ", current=" + WalkGeneration + ")", 1)
+		return true
+	endIf
+	return false
+endFunction
+
+; WALKING.SceneStopped 전용: 세대까지 맞아도 WALKING.OnBeginState()가 아직 안 끝났으면
+; (DstMarker 등이 아직 안정화되지 않았을 수 있으므로) 때이른 이벤트로 보고 무시해야 한다.
+bool function IsStaleOrPrematureWalkingEvent(Var[] _args)
+	if IsStaleGeneration(_args)
+		return true
+	endIf
+	if !bWalkingReady
+		Debug.Trace("AutoWalk: IsStaleOrPrematureWalkingEvent(): premature (WALKING not ready yet, gen=" + WalkGeneration + ")", 1)
+		return true
+	endIf
+	return false
+endFunction
+
 event OnTimer(int _timer)
 	if _timer == TimerMenuKeyDown
 		Debug.Trace("AutoWalk: OnTimer: TimerMenuKeyDown triggered, showing menu.", 1)
 		ShowMenu()
 	elseif _timer == TimerCheckArrival
-		float dist = SUP_F4SE.GetDistanceBetweenPoints(CurrentCustomDstMarker.X, PlayerRef.x, CurrentCustomDstMarker.Y, PlayerRef.y, 0, 0 )
+		ObjectReference _dst = CurrentCustomDstMarker
+		if _dst == None
+			_dst = DstMarker.GetReference()
+		endIf
+		float dist = 9999.0
+		if _dst
+			dist = SUP_F4SE.GetDistanceBetweenPoints(_dst.X, PlayerRef.x, _dst.Y, PlayerRef.y, 0, 0 )
+		endIf
 		Debug.Trace("AutoWalk: OnTimer: early stop timer: dist=" + dist +", bWalking=" + bWalking, 1)
+		; 커스텀 마커 목적지가 플레이어 로드 셀 범위(약 2셀 이내)에 들어오면
+		; RayCast로 정확한 지상 Z를 재측정해 목적지 Z를 보정한다.
+		; (출발 시점에 원격이라 navmesh로 실패했던 navmesh hole 목적지가
+		;   셀이 로드된 지금은 정확한 Z를 얻을 수 있다.)
+		if bWalking && CurrentCustomDstMarker && dist <= 8192.0
+			MarkerDBScript.ReRequestGroundZ()
+		endif
 		if dist <= 300.0
 			CancelTimer(TimerCheckArrival)
 			MorsAW_Scene.Stop()
@@ -542,10 +637,15 @@ state STARTING
 		GoToState("WALKING")
 	endEvent
 	event scene.OnEnd(Scene _scene)
-		Debug.trace("AutoWalk: OnEnd(STARTING)", 1)
-		SendCustomEvent("SceneStopped", None)
+		Debug.trace("AutoWalk: scene.OnEnd(STARTING)", 1)
+		SendSceneStoppedEvent()
 	endEvent
 	event Mors:AutoWalk.SceneStopped(Mors:AutoWalk _sender, Var[] _args)
+		if IsStaleGeneration(_args)
+			Debug.trace("AutoWalk: SceneStopped(STARTING): Ignoring stale event.", 1)
+			Debug.Notification("AutoWalk: SceneStopped(STARTING): Ignoring stale event.")
+			return
+		endIf
 		; Scene stopped immediately, and we need to clean up to avoid player locking up.
 		Debug.trace("AutoWalk: SceneStopped(STARTING): Calling CheckCombatStateAndStop(True)...", 1)
 		CheckCombatStateAndStop(True)
@@ -565,10 +665,15 @@ state RESTARTING
 	endEvent
 	event scene.OnEnd(scene _scene)
 		Debug.trace("AutoWalk: scene.OnEnd(RESTARTING)", 1)
-		SendCustomEvent("SceneStopped")
+		SendSceneStoppedEvent()
 	endEvent
 	; NOTE: We must rely on custom event SceneStopped send from within the OnEnd handler to introduce additional delay without using a timer. The delay is needed for the Scene to have time to stop completely before we use Scene.IsPlaying() which would otherwise still return True!
 	event Mors:AutoWalk.SceneStopped(Mors:AutoWalk _sender, Var[] _args)
+		if IsStaleGeneration(_args)
+			Debug.trace("AutoWalk: SceneStopped(RESTARTING): Ignoring stale event.", 1)
+			Debug.Notification("AutoWalk: SceneStopped(RESTARTING): Ignoring stale event.")
+			return
+		endIf
 		Debug.trace("AutoWalk: SceneStopped(RESTARTING)", 1)
 		ReleasePlayer()
 		GoToState("STARTING")
@@ -581,6 +686,9 @@ state WALKING
 		Debug.Notification("Walking to " + dstName)
 		ObjectReference obj = DstMarker.GetReference()
 		Debug.Trace("AutoWalk: OnBeginState(WALKING): Walking to "+ dstName +"(" + obj.GetCurrentLocation() + "," + obj +")" + "(" + obj.X as Int+ ", " + obj.Y as Int +", " + obj.Z as Int+ ")", 1)
+		; WALKING 진입 시 필요한 초기화가 다 끝난 시점에만 ready를 True로 올린다.
+		; 이 줄 이전에 도착하는 SceneStopped 이벤트는 IsStaleOrPrematureWalkingEvent()에서 걸러진다.
+		bWalkingReady = true
 	EndEvent
 
 	; WALKING 상태에서는 scene.OnBegin 이벤트가 발생하지 않음.
@@ -591,14 +699,51 @@ state WALKING
 	event scene.OnEnd(scene _scene)
 		Debug.trace("AutoWalk: scene.OnEnd(WALKING)", 1)
 		GoToState("STOPPING")
-		SendCustomEvent("SceneStopped")
+		SendSceneStoppedEvent()
 	endEvent
 
 	Event Mors:AutoWalk.SceneStopped(Mors:AutoWalk _sender, Var[] _args)
+		if IsStaleGeneration(_args)
+			; 이전 세대 이벤트: 그 사이 재시작이 이미 진행 중이므로 무시해도 안전하다.
+			Debug.trace("AutoWalk: SceneStopped(WALKING): stale event. Ignoring.", 1)
+			return
+		endIf
+		if !bWalkingReady
+			; WALKING.OnBeginState()가 끝나기 전에 도착한 때이른 이벤트.
+			if MorsAW_Scene.IsPlaying()
+				; Scene은 정상 재생 중이다(그저 전달 순서가 빨랐을 뿐). 무시.
+				Debug.trace("AutoWalk: SceneStopped(WALKING): premature but scene still playing. Ignoring.", 1)
+				return
+			endIf
+			; Scene이 출발 직후 실제로 죽었다(예: No Aggro 중 전투로 Travel 패키지 배치 실패).
+			; 여기서 멍하니 return하면 플레이어가 ReservePlayer() 상태로 남아 락업된다.
+			; 전투를 재차 해소하고 STARTING부터 다시 시도한다. 시도 횟수를 초과하면
+			; STOPPING으로 정리해 ReleasePlayer()까지 반드시 수행한다.
+			if iSceneStartRetry < iMaxSceneStartRetry
+				iSceneStartRetry += 1
+				Debug.trace("AutoWalk: SceneStopped(WALKING): scene died at start, retrying (" + iSceneStartRetry + "/" + iMaxSceneStartRetry + ").", 1)
+				PlayerRef.StopCombat()
+				PlayerRef.StopCombatAlarm()
+				PlayerRef.EvaluatePackage()
+				BeginNewWalkGeneration()
+				GoToState("STARTING")
+			else
+				Debug.trace("AutoWalk: SceneStopped(WALKING): scene died at start, giving up after " + iSceneStartRetry + " retries.", 1)
+				GoToState("STOPPING")
+			endIf
+			return
+		endIf
 		; If distance to destination is far enough but scene is stopped without OnCombatStateChanged event or user pressing the hotkey, 
 		; then there must be some threat only the scene can detect.
 		; To avoid locking up the player, we need to ReleasePlayer by switching state to STOPPING.
-		float dist = SUP_F4SE.GetDistanceBetweenPoints(CurrentCustomDstMarker.X, PlayerRef.x, CurrentCustomDstMarker.Y, PlayerRef.y, 0, 0 )
+		ObjectReference _dst = CurrentCustomDstMarker
+		if _dst == None
+			_dst = DstMarker.GetReference()
+		endIf
+		float dist = 9000.0
+		if _dst
+			dist = SUP_F4SE.GetDistanceBetweenPoints(_dst.X, PlayerRef.x, _dst.Y, PlayerRef.y, 0, 0 )
+		endIf
 		bool hint = dist > 5000.0 && !bCaptive
 		Debug.trace("AutoWalk: SceneStopped(WALKING): Calling CheckCombatStateAndStop(" + hint + ")...", 1)
 		CheckCombatStateAndStop(hint)
@@ -677,7 +822,9 @@ endState
 function CleanupCustomEventSubscriptions()
 	UnregisterForCustomEvent(Self, "SceneStopped")
 	UnregisterForCustomEvent(AWR_JitterMonitor, "MonitoringStopped")
-	UnregisterForCustomEvent(MarkerDBScript, "UpdateCustomDestination")
+; NOTE: MarkerDBScript의 UpdateCustomDestination 등록은 해제하지 않는다.
+; 커스텀 목적지 Z는 비동기 보정(CalibrateCustomDestinationMarker)이 끝난 뒤에 정확한 지상 Z로 갱신된다.
+; 여기서 해제하면 마커 Z가 최신값으로 반영되지 않아 목적지가 지표면에 묻힌 채 남는다.
 endFunction
 
 ObjectReference Function GetCustomDstMarker()
@@ -703,7 +850,14 @@ Function UpdateCustomDestination(AutoWalkMarkerDB:CustomDestinationMarkerInfo ma
 
 	if bWalking
 		CancelTimer(TimerCheckArrival)
-		float dist = SUP_F4SE.GetDistanceBetweenPoints(CurrentCustomDstMarker.X, PlayerRef.x, CurrentCustomDstMarker.Y, PlayerRef.y, 0, 0 )
+		ObjectReference _dst = CurrentCustomDstMarker
+		if _dst == None
+			_dst = DstMarker.GetReference()
+		endIf
+		float dist = 9999.0
+		if _dst
+			dist = SUP_F4SE.GetDistanceBetweenPoints(_dst.X, PlayerRef.x, _dst.Y, PlayerRef.y, 0, 0 )
+		endIf
 		if dist < 5000.0
 		arrivalCheckInterval = 1.0
 		else

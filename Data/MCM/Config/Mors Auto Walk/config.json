@@ -310,6 +310,28 @@
       "content": [
         {
           "type": "section",
+          "text": "Jitter Detection Debug"
+        },
+        {
+          "type": "text",
+          "text": "Press this hotkey the moment you visually notice jittering (\"Crazy Dance\") while walking, even if no jitter warning was shown. This dumps the recent raw sample history to the log for later analysis, to help tune detection thresholds."
+        },
+        {
+          "type": "spacer",
+          "numLines": 1
+        },
+        {
+          "type": "hotkey",
+          "text": "Mark Jitter Observed",
+          "id": "MorsAutoWalkJitterMarkHotkey",
+          "help": "Press while walking, right when you see jittering happen, to log the recent raw samples."
+        },
+        {
+          "type": "spacer",
+          "numLines": 1
+        },
+        {
+          "type": "section",
           "text": "Fix Ghost State"
         },
         {
